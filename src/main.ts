@@ -13,7 +13,6 @@ function requiredElement<ElementType extends HTMLElement>(selector: string): Ele
 
 const signInButton = requiredElement<HTMLButtonElement>('#sign-in');
 const signOutButton = requiredElement<HTMLButtonElement>('#sign-out');
-const authorizeButton = requiredElement<HTMLButtonElement>('#connect');
 const signInStatus = requiredElement('#connect-status');
 const authorizationStatus = requiredElement('#connection-status');
 
@@ -111,7 +110,6 @@ async function main(): Promise<void> {
   let failedVerification = false;
   let identity = client.auth.getSession()?.address.toLowerCase();
   let expiryTimer: number | undefined;
-  let authorizationMessage: string | undefined;
   let verificationGeneration = 0;
   let round: PaidRound | undefined;
 
@@ -124,12 +122,11 @@ async function main(): Promise<void> {
     signOutButton.disabled = busy;
     const authorization = game.getAuthorization();
     const valid = authorization?.address.toLowerCase() === session?.address.toLowerCase() && Boolean(authorization);
-    authorizeButton.hidden = !authenticated || valid;
-    authorizeButton.disabled = busy || !authenticated || valid;
-    authorizeButton.textContent = 'Authorize this game';
-    authorizationStatus.textContent = authorizationMessage ?? (valid
-      ? `Game authorized for ${authorization?.address}. Purchases and plays still require your explicit approval.`
-      : 'Authorize this game to load credits. Signing in never buys credits or starts a paid play.');
+    authorizationStatus.textContent = authenticated
+      ? valid
+        ? `Game account ready for ${authorization?.address}. Choose Play — spend 1 credit to start one run; buying credits remains separate.`
+        : 'Choose Play — spend 1 credit to connect this game and start one run. If no credit is available, no play starts; you can then buy credits separately.'
+      : 'Sign in, then choose Play — spend 1 credit. That click connects the game and starts at most one run; credit purchases remain separate.';
     window.clearTimeout(expiryTimer);
     const expiries = [session?.expiresAt, authorization?.expiresAt]
       .filter((value): value is string => value !== undefined)
@@ -143,13 +140,13 @@ async function main(): Promise<void> {
   });
   const creditPanel = credits;
   round = new PaidRound({
-    game, scoringGame, variant: configuration.game,
+    game, scoringGame, variant: configuration.game, appId: configuration.appId, groupId: configuration.groupId,
     root: requiredElement('#game'), storageKey: `${storageKey}:round`,
     getBalance: async () => {
       await creditPanel.refresh();
       return creditPanel.balance;
     },
-    getAddress: () => client.auth.getSession()?.address,
+    getAddress: () => authenticated ? client.auth.getSession()?.address : undefined,
   });
   const paidRound = round;
   creditPanel.render();
@@ -226,26 +223,11 @@ async function main(): Promise<void> {
       authenticated = result.status === 'authenticated';
       dismissConnectModal();
       failedVerification = false;
-      signInStatus.textContent = authenticated ? 'Signed in. Authorize this game when ready.'
+      signInStatus.textContent = authenticated ? 'Signed in. Choose Play — spend 1 credit to connect this game and start one run.'
         : `Sign-in ${result.status}. No purchase or play was started.`;
       await refreshPanels();
     } catch (error) {
       signInStatus.textContent = `Sign-in failed (${describeSdkFailure(error)}). Retry when ready; recovery records are preserved.`;
-    } finally { busy = false; renderAuth(); }
-  });
-  authorizeButton.addEventListener('click', async () => {
-    if (busy || !authenticated) return;
-    authorizationMessage = undefined;
-    busy = true;
-    renderAuth();
-    try {
-      const authorization = await game.connect();
-      if (authorization.address.toLowerCase() !== client.auth.getSession()?.address.toLowerCase()) {
-        throw new Error('Game authorization does not belong to the signed-in wallet. Sign out and reconnect.');
-      }
-      await refreshPanels();
-    } catch (error) {
-      authorizationMessage = `Game authorization failed (${describeSdkFailure(error)}). No purchase or play was started.`;
     } finally { busy = false; renderAuth(); }
   });
   signOutButton.addEventListener('click', async () => {
@@ -267,7 +249,6 @@ async function main(): Promise<void> {
 
 void main().catch((error: unknown) => {
   signInButton.disabled = true;
-  authorizeButton.disabled = true;
   signInStatus.textContent = 'Valid organizer configuration is required before signing in.';
   authorizationStatus.textContent = describeSdkFailure(error);
 });

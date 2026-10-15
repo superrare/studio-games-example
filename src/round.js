@@ -61,7 +61,7 @@ function recoveryMessage(error) {
 }
 
 export class PaidRound {
-  constructor({ game, scoringGame, variant, root, getBalance, getAddress, storageKey }) {
+  constructor({ game, scoringGame, variant, root, getBalance, getAddress, storageKey, appId, groupId }) {
     this.game = game;
     this.scoringGame = scoringGame;
     this.variant = variant;
@@ -69,6 +69,8 @@ export class PaidRound {
     this.getBalance = getBalance;
     this.getAddress = getAddress;
     this.baseStorageKey = storageKey;
+    this.appId = appId;
+    this.groupId = groupId;
     this.state = null;
     this.storageKey = null;
     this.timer = null;
@@ -131,11 +133,12 @@ export class PaidRound {
   }
 
   accountStorageKey() {
+    const address = this.getAddress()?.toLowerCase();
+    if (!address) return null;
     const authorization = this.game.getAuthorization();
-    if (!authorization?.address || authorization.address.toLowerCase() !== this.getAddress()?.toLowerCase()) return null;
-    const appId = authorization.appId;
-    const groupId = authorization.groupId;
-    return `${STORAGE_PREFIX}${encodeURIComponent(this.baseStorageKey)}:${encodeURIComponent(appId)}:${encodeURIComponent(groupId)}:${encodeURIComponent(authorization.address.toLowerCase())}`;
+    if (authorization && (authorization.address.toLowerCase() !== address
+      || authorization.appId !== this.appId || authorization.groupId !== this.groupId)) return null;
+    return `${STORAGE_PREFIX}${encodeURIComponent(this.baseStorageKey)}:${encodeURIComponent(this.appId)}:${encodeURIComponent(this.groupId)}:${encodeURIComponent(address)}`;
   }
 
   save() {
@@ -178,7 +181,7 @@ export class PaidRound {
       this.storageKey = null;
       this.state = null;
       this.scoreNode.textContent = 'Score: 0';
-      this.announce('Connect your game account in the Connect panel before playing.');
+      this.announce('Sign in before choosing a paid play.');
       return;
     }
     this.storageKey = key;
@@ -222,7 +225,7 @@ export class PaidRound {
       const [terms] = await Promise.all([this.game.getTerms(), this.scoringGame.getActiveScoringEvent()]);
       if (terms.credits !== 1) throw new Error('This example requires exactly 1 credit per play. Ask the organizer to correct its terms.');
       if (generation !== this.playActionGeneration || this.storageKey !== accountKey || this.state !== previous) return;
-      this.button(`Play · ${terms.credits} credit${terms.credits === 1 ? '' : 's'}`, () => void this.prepareRound(terms.credits));
+      this.button(`Play — spend ${terms.credits} credit${terms.credits === 1 ? '' : 's'}`, () => void this.prepareRound(terms.credits));
     } catch (error) {
       if (generation !== this.playActionGeneration || this.storageKey !== accountKey || this.state !== previous) return;
       this.announce(`Could not load the game price: ${errorMessage(error)} No new play was started.`);

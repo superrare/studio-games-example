@@ -124,9 +124,9 @@ Event attempt limits apply to scoring identities, not people. Event end and paid
 
 ## Player flow and payment recovery
 
-Authentication, game authorization, buying credits, and spending a credit are distinct actions. A fresh wallet has zero purchased credits. The explicit purchase flow reads the current Studio quote, verifies mainnet canonical USDC and exactly `$0.10 / 10 credits`, persists recovery evidence, and opens the hosted wallet action only after the player confirms. Wallet transfer UI alone does not prove that credits were claimed; trust Studio's authoritative balance.
+Sign in first. The first explicit **Play — spend 1 credit** click connects the game if needed, checks current terms/balance/event, then requests one-use consent for that exact single paid start. There is no separate game-authorization button or additional play-confirmation screen. If balance is insufficient, no paid start is sent; the game connection lets the player use the separate Buy credits flow. Buying credits reads the signed Studio quote and still requires explicit wallet transfer approval.
 
-Each explicit Play action checks the current app terms are exactly 1 credit and verifies available balance before requesting one-use consent and starting the paid session. Studio charges through the authorized paid `PlaySession`. The browser starts the server-validated run for that paid session and event, then submits ordered movement/flap inputs—never state, score, collision or tick claims. Only the completed verifier result is official. The two apps on different origins read the same group wallet balance; their local recovery records remain separate.
+Every visible **Play — spend 1 credit** action is the approval for exactly one one-credit paid play. Studio charges through the authorized `PlaySession`; the browser starts the server-validated run for that session and event, then sends ordered movement/flap inputs—never state, score, collision or tick claims. Only the completed verifier result is official. A price mismatch, insufficient balance or failed game connection must stop before consent/start; never silently accept a changed cost. Both apps on different origins read the same group wallet balance, while local recovery records remain separate.
 
 On an uncertain response, recover the same purchase quote/intent/hash, original paid-start idempotency key, session, event and server-run key. Do not create another payment or debit to resolve ambiguity. Storage unreadability or memory-only consent blocks unsafe retry. A socket reconnect recovers the same server run; it does not restart the server clock. Do not clear evidence or change wallets to bypass recovery. See the detailed recovery handling in the existing `PaidRound` and `Credits` implementation and preserve identifiers when contacting trusted support; never share tokens or one-use socket URLs.
 
@@ -138,7 +138,7 @@ On an uncertain response, recover the same purchase quote/intent/hash, original 
 - [ ] Both live app registrations identify the intended group, exact HTTPS origin and 1-credit cost.
 - [ ] Group state reports chain 1, canonical USDC, controlled treasury, `100000` / 10, and purchases/new uses unpaused.
 - [ ] Both deployments have their own current pinned verifier, matching config and active event.
-- [ ] On both deployed HTTPS origins, page load/reload does not open hosted UI; explicit sign-in opens the embedded modal, and no purchase or paid run starts without its own user action.
+- [ ] On both deployed HTTPS origins, page load/reload/sign-in does not buy credits or start a paid run; after sign-in there is no separate game-authorization button, and the visible priced Play click starts at most one one-credit run or reports insufficient balance without charging.
 - [ ] Insufficient balance, missing event and failed authorization do not fall back to free play or client-authoritative score.
 
 ### Real mainnet acceptance requires explicit payer approval

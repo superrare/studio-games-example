@@ -23,10 +23,9 @@
             <button id="sign-in" class="secondary" type="button" disabled>Checking Connect sign-in…</button>
             <p id="connect-status" role="status" aria-live="polite">Checking the saved SuperRare Connect session…</p>
             <button id="sign-out" class="secondary" type="button" hidden>Sign out / switch wallet</button>
-            <button id="connect" class="secondary" type="button" hidden>Retry game authorization</button>
-            <p id="connection-status" role="status" aria-live="polite">Sign in to SuperRare to connect this game and load credits.</p>
+            <p id="connection-status" role="status" aria-live="polite">Sign in, then choose Play — spend 1 credit. That click connects this game and authorizes one run.</p>
           </div>
-          <p class="fine-print">Authentication, game authorization, payment confirmation, and Play are separate approvals. Reloading or visiting the other game never starts a purchase or paid play. Purchases need hosted wallet approval.</p>
+          <p class="fine-print">Sign-in, buying credits, and playing are separate actions. Play — spend 1 credit authorizes one game run without a separate game-authorization button. Purchases need hosted wallet approval. Reloading or visiting the other game never starts a purchase or paid play.</p>
         </aside>
       </section>
       <details class="developer"><summary>Integration details</summary><p id="configuration"></p><p>The ZIP includes a server-verifier.js worker. Studio’s Workers for Platforms runtime validates ordered inputs, advances server-owned time, and records the verifier’s final score. The browser never submits a claimed score.</p></details>

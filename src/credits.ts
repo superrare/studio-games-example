@@ -180,7 +180,7 @@ export class Credits {
     if (!this.record) {
       text(this.detailsText, this.accountAddress
         ? 'No purchase is in progress for this game account.'
-        : 'Saved purchases remain isolated per game account. Reauthorize the same account to resume or reconcile them.');
+        : 'Saved purchases remain isolated per game account. Choose Play with the same account to reconnect and resume or reconcile them.');
       return;
     }
     const purchase = this.record.purchase;
@@ -301,7 +301,9 @@ export class Credits {
     if (!authorization) {
       this.accountAddress = undefined;
       this.balance = undefined;
-      text(this.balanceLabel, 'Credits: connect your game account to load balance.');
+      text(this.balanceLabel, this.client.auth.getSession()
+        ? 'Credits: choose Play to connect this game and load your balance.'
+        : 'Credits: sign in, then choose Play to connect this game and load your balance.');
       this.record = undefined;
       this._showDetails();
       this._renderActions();
@@ -319,12 +321,12 @@ export class Credits {
         this.balance = undefined;
         text(this.balanceLabel, currentAuthorization
           ? 'Credits: loading current game account…'
-          : 'Credits: connect your game account to load balance.');
+          : 'Credits: choose Play to reconnect this game and load your balance.');
         this.accountAddress = currentAuthorization?.address;
         this.record = currentAuthorization ? this._loadRecord(currentAuthorization.address) : undefined;
         this._say(currentAuthorization
           ? 'Game account changed while loading. Showing only the newly authorized account; saved purchases remain isolated per account.'
-          : 'Game authorization expired while loading. Saved purchase records remain preserved per account; authorize the game again to resume.');
+          : 'Game connection expired while loading. Choose Play to reconnect; saved purchase records remain preserved per account.');
         this._showDetails();
         this._renderActions();
         this.changed();
@@ -344,13 +346,13 @@ export class Credits {
       this.balance = undefined;
       text(this.balanceLabel, currentAuthorization
         ? 'Credits: balance could not be loaded.'
-        : 'Credits: connect your game account to load balance.');
+        : 'Credits: choose Play to reconnect this game and load your balance.');
       if (currentAuthorization?.address !== authorization.address) {
         this.accountAddress = currentAuthorization?.address;
         this.record = currentAuthorization ? this._loadRecord(currentAuthorization.address) : undefined;
         this._say(currentAuthorization
           ? 'Game account changed while loading. Showing only the newly authorized account; saved purchases remain isolated per account.'
-          : `Could not load credit balance (${describeSdkFailure(error)}); game authorization is no longer available. Saved purchase records remain preserved per account.`);
+          : `Could not load credit balance (${describeSdkFailure(error)}); game connection expired. Choose Play to reconnect; saved purchase records remain preserved per account.`);
         this._showDetails();
         this._renderActions();
         this.changed();

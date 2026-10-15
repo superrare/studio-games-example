@@ -49,7 +49,7 @@ test('uncertain paid start and server-run retry retain original keys, event, and
       startServerValidatedRun: async (request: RunRequest) => { runs.push(request); throw new Error('lost run response'); },
       getActiveScoringEvent: async () => { throw new Error('must not rediscover event during recovery'); },
     },
-    variant: 'flappy-bird', root: null, getBalance: () => ({ available: 10 }), getAddress: () => address, storageKey: 'test',
+    variant: 'flappy-bird', root: null, getBalance: () => ({ available: 10 }), getAddress: () => address, storageKey: 'test', appId, groupId,
   };
   round = new RoundHarness(options);
   round.storageKey = round.accountStorageKey();
@@ -76,6 +76,51 @@ test('uncertain paid start and server-run retry retain original keys, event, and
   assert.deepEqual(runs[1], runs[0], 'same event/run key/session are replayed, even when active-event discovery fails');
 });
 
+test('the priced Play action connects and approves exactly one paid run for the signed-in account', async () => {
+  let currentAuthorization: typeof authorization | undefined;
+  const calls: string[] = [];
+  const game = {
+    getAuthorization: () => currentAuthorization,
+    connect: async () => {
+      calls.push('connect');
+      currentAuthorization = authorization;
+    },
+    getTerms: async () => {
+      calls.push('terms');
+      return terms;
+    },
+    requestConsent: async (request: PaidRequest) => {
+      calls.push('consent');
+      assert.equal(request.expectedCredits, 1);
+      return { consent: { token: 'test-only-consent' }, recovery: 'persistent' };
+    },
+    startWithConsent: async () => {
+      calls.push('paid-start');
+      return { session: { id: 'paid-session', token: 'test-only-session', expiresAt: '2099-01-01T00:00:00Z' }, game: {} };
+    },
+  };
+  const round = new RoundHarness({
+    game,
+    scoringGame: { getActiveScoringEvent: async () => { calls.push('event'); return { eventId }; } },
+    variant: 'flappy-bird',
+    root: null,
+    getBalance: async () => { calls.push('balance'); return { available: 5 }; },
+    getAddress: () => address,
+    storageKey: 'test',
+    appId,
+    groupId,
+  });
+  const keyBeforeConnect = round.accountStorageKey();
+  assert.equal(keyBeforeConnect, `studio-games-round:${encodeURIComponent('test')}:${appId}:${groupId}:${address}`);
+  round.storageKey = keyBeforeConnect;
+  round.beginPlay = async () => { calls.push('begin-run'); };
+  await round.prepareRound(1);
+  assert.equal(round.accountStorageKey(), keyBeforeConnect);
+  assert.deepEqual(calls, ['connect', 'terms', 'balance', 'event', 'consent', 'paid-start', 'begin-run']);
+  assert.equal(round.state?.phase, 'ready');
+  assert.equal(round.state?.request.expectedCredits, 1);
+});
+
 test('wallet replacement during consent never starts or transfers the old wallet play', async () => {
   let currentAddress = address;
   let starts = 0;
@@ -85,7 +130,7 @@ test('wallet replacement during consent never starts or transfers the old wallet
     requestConsent: async () => { currentAddress = '0x2222222222222222222222222222222222222222'; return { consent: {} }; },
     startWithConsent: async () => { starts += 1; throw new Error('must never run'); },
   };
-  round = new RoundHarness({ game, scoringGame: {}, variant: 'platformer', root: null, getBalance: () => ({ available: 10 }), getAddress: () => currentAddress, storageKey: 'test' });
+  round = new RoundHarness({ game, scoringGame: {}, variant: 'platformer', root: null, getBalance: () => ({ available: 10 }), getAddress: () => currentAddress, storageKey: 'test', appId, groupId });
   round.storageKey = round.accountStorageKey();
   const originalStorageKey = round.storageKey;
   await round.confirmRound(terms, 'original-paid-key', eventId);
@@ -111,7 +156,7 @@ test('memory-only consent never sends a paid start and retains the original atte
   };
   const round = new RoundHarness({
     game, scoringGame: {}, variant: 'platformer', root: null,
-    getBalance: () => ({ available: 10 }), getAddress: () => address, storageKey: 'test',
+    getBalance: () => ({ available: 10 }), getAddress: () => address, storageKey: 'test', appId, groupId,
   });
   round.storageKey = round.accountStorageKey();
   await round.confirmRound(terms, 'original-paid-key', eventId);

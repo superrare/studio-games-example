@@ -7,7 +7,7 @@ Two original browser games share one Studio credit group through the published *
 
 Each game has a separate Studio app and HTTPS origin; both attach to the same wallet balance. Each play costs **1 credit**. The configured purchase pack is **$0.10 USDC for 10 credits** on Ethereum mainnet. Network fees are separate and may exceed the pack price.
 
-These are real payment integrations, not demos or faucets. Sign-in, purchases, and paid starts remain separate explicit actions. Only the completed result from the pinned server verifier is official. Deterministic server rules prevent browser score forgery; they cannot prove that a valid player input came from a human. Bots, multi-wallet abuse, and contest eligibility need separate controls and manual organizer review. Do not describe these games as bot-proof.
+These are real payment integrations, not demos or faucets. Sign-in and credit purchases remain separate explicit actions. The visible **Play — spend 1 credit** click connects the game if needed and authorizes exactly one paid start; there is no separate game-authorization button. Only the completed result from the pinned server verifier is official. Deterministic server rules prevent browser score forgery; they cannot prove that a valid player input came from a human. Bots, multi-wallet abuse, and contest eligibility need separate controls and manual organizer review. Do not describe these games as bot-proof.
 
 ## Setup
 
@@ -59,10 +59,10 @@ Read [server verification and abuse limits](docs/server-verification.md) before 
 
 Both apps are deployed at their permanent HTTPS origins and registered in one shared mainnet credit group:
 
-- **Sky Hopper:** app `f89bd492-1479-46ff-b455-1ec479e45684` · [tu9zzywe.srstudio.dev](https://tu9zzywe.srstudio.dev) · current deployment `3e8208b7-4b84-4135-9ff2-7d860f54c3d2` · event `c829da99-4c3b-4306-9a71-654e775af781`.
-- **Star Runner:** app `7d0a34a0-ca86-413a-871c-7b731adf4511` · [q77e66pg.srstudio.dev](https://q77e66pg.srstudio.dev) · current deployment `e0aaca35-8406-4626-92dd-52402f6d461c` · event `bd9e8d8c-27e4-47a4-8a3d-45a47bab0c93`.
+- **Sky Hopper:** app `f89bd492-1479-46ff-b455-1ec479e45684` · [tu9zzywe.srstudio.dev](https://tu9zzywe.srstudio.dev) · deployed app version 5.
+- **Star Runner:** app `7d0a34a0-ca86-413a-871c-7b731adf4511` · [q77e66pg.srstudio.dev](https://q77e66pg.srstudio.dev) · deployed app version 5.
 
-Group `8020b761-b30e-41a5-9f14-8c82728cfdb2` is configured for canonical Ethereum USDC at **$0.10 / 10 credits**, with each app costing **1 credit per play**. Both authenticated server-scoring events are active with a 20-attempt per-identity limit. Sign-in and hosted wallet checkout open in embedded Connect modals. The group and event setup is live-capable, but no wallet purchase or paid gameplay was exercised. Buying credits transfers real USDC to the configured treasury; don't purchase merely to inspect the games. Local app configs are ignored and contain the shared group binding.
+Group `8020b761-b30e-41a5-9f14-8c82728cfdb2` is configured for canonical Ethereum USDC at **$0.10 / 10 credits**, with each app costing **1 credit per play**. Both apps now run version 5 with embedded Connect modals and the new priced-Play authorization flow. Updating an app changes its deployment UUID; the version 5 deployments currently have no active scoring event. Paid play remains unavailable until each fresh deployment has its own published verifier version and active event. Sign-in and hosted wallet checkout open in embedded Connect modals. Clicking **Play — spend 1 credit** connects the game and authorizes one paid run; buying credits still requires explicit wallet approval. No wallet purchase or paid gameplay was exercised. Buying credits transfers real USDC to the configured treasury; don't purchase merely to inspect the games. Local app configs are ignored and contain the shared group binding.
 
 The public leaderboard is app-level; it is not a combined-game ranking or contest result. Bot-resistance and manual prize-review limits are described above and in the [verification guide](docs/server-verification.md).
 
