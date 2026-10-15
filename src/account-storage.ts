@@ -1,6 +1,6 @@
 import type { ConnectSessionStorage } from '@rareprotocol/connect';
 
-// Connect 0.8.0's game keys omit the wallet. Its supported storage adapter lets
+// SDK game keys omit the wallet. Its supported storage adapter lets
 // us isolate game authorization and pending-consent records without copying SDK
 // internals. Connect session credentials themselves keep their SDK-owned keys.
 export function accountStorage(storage: ConnectSessionStorage, address: () => string | undefined): ConnectSessionStorage {

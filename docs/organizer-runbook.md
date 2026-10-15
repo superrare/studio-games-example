@@ -33,7 +33,7 @@ cd studio-games-example
 pnpm install
 ```
 
-The repository pins the published **`@rareprotocol/connect@0.8.0`**, not an unpublished SDK checkout. That release supports popup flows, group credits, explicit consent/recovery and server-run start. It does **not** contain native embed or `getActiveScoringEvent`, `getServerTopScore`, or `getServerLeaderboard`. The example uses same-origin scoring HTTP reads instead; community leaderboards are not a substitute for server results.
+The repository pins the published **`@rareprotocol/connect@0.9.0-beta.0`** npm prerelease and its lockfile, not an unpublished SDK checkout. The SDK supplies popup sign-in, group credits, explicit consent/recovery, server-run start and public authoritative scoring reads. These examples call `getActiveScoringEvent()` and `getServerLeaderboard()` through a client pointed at the deployed game's own origin; community leaderboards are not a substitute for server results. Sign in with `auth.login()` before the API-only `game.connect()` authorization step. Native embedding is available in this beta but is deliberately not enabled in these popup examples.
 
 ### Current rare-profile release reality
 

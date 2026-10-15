@@ -2,7 +2,6 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { accountStorage } from '../src/account-storage.js';
 import { parseConfiguration } from '../src/config.js';
-import { ScoringReads } from '../src/scoring.js';
 import { Credits } from '../src/credits.js';
 
 const appId = '11111111-1111-4111-8111-111111111111';
@@ -42,13 +41,6 @@ test('configuration rejects placeholders, seeded query overrides, embed, origins
   assert.throws(() => parseConfiguration({ ...valid, appSecret: 'must-not-be-public' }));
   assert.throws(() => parseConfiguration(valid, 'https://unapproved.example.com'));
   assert.equal(parseConfiguration(valid, 'http://127.0.0.1:4173').appOrigin, valid.appOrigin);
-});
-
-test('public scoring reads reject client-asserted leaderboard entries and surface outages', async () => {
-  const invalid = new ScoringReads(appId, async () => Response.json({ version: '1', entries: [{ trustLevel: 'client_asserted', score: '999' }] }));
-  await assert.rejects(() => invalid.leaderboard());
-  const unavailable = new ScoringReads(appId, async () => new Response('down', { status: 503 }));
-  await assert.rejects(() => unavailable.activeEvent(), /HTTP 503/);
 });
 
 test('unreadable purchase evidence blocks replacement quotes without deleting the stored record', async () => {

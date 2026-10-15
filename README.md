@@ -1,6 +1,6 @@
 # Studio games example
 
-Two distinct browser games built from one public repository, using the published **`@rareprotocol/connect@0.8.0`** package:
+Two distinct browser games built from one public repository, using the published **`@rareprotocol/connect@0.9.0-beta.0`** npm package, pinned exactly with its lockfile:
 
 - **Target Rush:** click server-issued targets before the round ends.
 - **Color Match:** choose the server-requested color. A wrong choice does not earn a point.
@@ -80,8 +80,8 @@ Local HTTP is for development, not paid-flow acceptance: Studio registers exact 
 
 ## Integration boundaries
 
-- Published Connect 0.8.0 supplies popup authentication, scoped group credits, payment intents, explicit paid-start consent/recovery and server-run start. It does **not** include the reference branch's native embed or `getActiveScoringEvent`, `getServerTopScore`, or `getServerLeaderboard` helpers.
-- The example reads scoring discovery and the server-verified leaderboard on the deployed game's own origin. Its server-run client uses that origin too, so WebSocket tickets are used on the correct host. Credit operations use canonical Studio.
+- Published Connect 0.9.0-beta.0 supplies popup authentication, scoped group credits, payment intents, explicit paid-start consent/recovery, server-run start and authoritative scoring reads. Sign-in uses `auth.login()`; `game.connect()` then authorizes through the Studio API without opening another hosted flow. The SDK supports opt-in embedding, but these examples deliberately keep popup authentication.
+- The example calls the SDK's `getActiveScoringEvent()` and `getServerLeaderboard()` on the deployed game's own origin. Its server-run client uses that origin too, so WebSocket tickets are used on the correct host. Credit operations use canonical Studio. No copied scoring HTTP client or SDK checkout is required.
 - Saved purchase, consent, paid-start, server-run and completion records are recovery evidence, not permission to initiate another payment or charge. Preserve original keys after uncertain outcomes and keep records scoped to wallet, group, app and origin.
 - Unreadable purchase recovery records block replacement purchases instead of treating the old payment as absent. Memory-only consent blocks paid start until durable recovery is restored. JavaScript/CSS asset names are content-hashed for Studio's immutable asset cache.
 - A fresh account starts with zero purchased credits. No seeded credits, automatic grants, free paid-start fallback or automated prize payouts are included.
@@ -99,7 +99,9 @@ The public top score spans completed events/builds for an app. It is not an even
 
 These are mainnet integration-test deployments, not free-play demos. Both use one enabled credit group at **0.01 USDC / 10 credits**, **1 credit / round**, and have separate deployment-pinned verifiers and authenticated scoring events. Do not send money merely to inspect the example.
 
-Verified: both artifact builds, typecheck, 13 focused regressions, both packaged verifier rounds (including rejection of a wrong color), production verifier conformance/event publication, live active-event and empty server-leaderboard reads, desktop/mobile signed-out rendering, hosted Connect sign-in surfaces with the correct initiating origin, and cancellation without payment or paid-start requests.
+The source now uses the published Connect beta. These URLs still represent the original 0.8.0 deployments until the organizer rebuilds, redeploys and republishes their deployment-pinned verifier/events using the runbook; changing the dependency does not update live games automatically.
+
+Original 0.8.0 deployment check: both artifact builds, typecheck, 13 focused regressions, both packaged verifier rounds (including rejection of a wrong color), production verifier conformance/event publication, live active-event and empty server-leaderboard reads, desktop/mobile signed-out rendering, hosted Connect sign-in surfaces with the correct initiating origin, and cancellation without payment or paid-start requests.
 
 Not yet exercised: completed player authentication, a real USDC transfer/claim, paid rounds, and the purchased-balance transition across both games. Those require the payer's explicit wallet approval; creator deployment credentials are not a substitute. Follow the runbook's separately approved mainnet acceptance checklist before treating this as payment/gameplay acceptance.
 
