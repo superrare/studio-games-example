@@ -4,6 +4,8 @@ This guide publishes **Target Rush** and **Color Match** from [the public exampl
 
 The supported production payment setup here is **Ethereum mainnet only** (`chainId: 1`), canonical Ethereum USDC (`0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48`), **0.01 USDC for 10 credits**, and **1 credit per play**. USDC has six decimals, so the pack costs `10000` atomic units. Network fees are separate; 0.01 USDC is not a gas limit or total-cost guarantee.
 
+Before adapting the game rules or accepting prize entries, read the [server-verification guide](server-verification.md). It explains the score-critical implementation, executable verifier checks, current automation/evidence limitations, and the manual review process. This runbook covers publishing and operation; passing verifier registration alone is not a security or fairness review.
+
 ## 1. Know what each identity controls
 
 | Identity | Meaning | Shared between these games? |
@@ -212,6 +214,8 @@ A local HTTP development server is not the registered HTTPS app and is not paid-
 ## 6. Publish a verifier version and scoring event
 
 A ZIP upload and credit registration are not enough for server-scored play. Every current deployment needs a verifier version and an event **for that deployment**. `scoring-config.json` is an artifact for the organizer to publish, not an automatic event-creation trigger.
+
+Implementers: use the [verifier contract and local exercises](server-verification.md#3-implement-the-verifier-contract-correctly) before publishing, and review the [adversarial acceptance matrix](server-verification.md#6-adversarial-acceptance-matrix) before admitting prize entries.
 
 ### Dashboard path for the unpaid integration smoke
 
@@ -462,7 +466,9 @@ If a browser is still holding an old paid session/run during an update, preserve
 
 Before announcing a contest, publish clear rules: organizer identity, eligible territories/ages, start/end **with timezone**, included app/event/build IDs, entry cost and whether a pack buys entries, maximum attempts, scoring semantics, ties, bot/multi-wallet policy, outages/updates, disqualification/appeals, prize amounts/assets, funding, claim deadline, recipient verification, taxes and refund/support terms. Obtain appropriate legal/payment review for paid-entry cash prizes. The toolkit is not that review.
 
-Example: a Target Rush contest can use one event from **2026-11-01 00:00 UTC through 2026-11-08 00:00 UTC**, three attempts per verified identity, highest completed server result, and an expressly published tie-break. Color Match can have a separate event and prize. If you want an overall two-game winner, define aggregation/normalization, identity mapping and tie-breaks yourself and audit them; raw scores from different games are not automatically comparable. Replace example dates with your actual future window.
+Use the [detailed manual review procedure](server-verification.md#7-review-results-before-paying-prizes) for complete event exports, evidence limits, candidate decisions, disqualifications/appeals and recipient verification. Keep original results separate from the organizer's eligibility decision log; no automatic server-run disqualification or payout endpoint is provided by this workflow.
+
+Example: a Target Rush contest can use one event from **2026-11-01 00:00 UTC through 2026-11-08 00:00 UTC**, three attempts per authenticated scoring identity (not per unique human), highest completed server result, and an expressly published tie-break. Color Match can have a separate event and prize. If you want an overall two-game winner, define aggregation/normalization, identity mapping and tie-breaks yourself and audit them; raw scores from different games are not automatically comparable. Replace example dates with your actual future window.
 
 ### Read the creator-only completed results feed
 
@@ -473,7 +479,7 @@ Authorization: Bearer <creator-session-jwt>
 
 Use the same local-PAT exchange procedure from section 6, then fetch that path with the in-memory JWT. The response has `runs` and `nextOffset`; request successive offsets until `nextOffset` is `null`. Limits are `1`–`100`, offsets `0`–`1000000`. Results contain run/event IDs, player or guest identity references, attempt number, score, ticks, start/end times and evidence hash. They do **not** provide a payout-ready verified-wallet address directory or an eligibility decision. Arrange a consented winner-identification/recipient-verification process rather than guessing addresses from identity IDs.
 
-The feed includes **completed runs only**, sorted by score descending, then end time, then run ID. That ordering does not replace your published tie policy. Active/expired attempts still count against event limits but are not completed results. Inspect event ID and deployment/rules before selecting winners. A run started before a window closes may finish after it; specify whether your rules require a start or a completed result within the window, then filter/review the timestamps accordingly. Do not assume the backend implements your prize cutoff policy.
+The feed includes **completed runs only**, sorted by score descending, then end time, then run ID. That ordering does not replace your published tie policy. Active/expired attempts still count against event limits but are not completed results. Inspect event ID and deployment/rules before selecting winners. **There is no finish-after-close grace period:** run expiry is bounded by session expiry, event end and a 10-minute cap, and new finalization at or after expiry/event end is rejected. A last-second entry may not have time to finish. Publish a last-start policy with adequate play/network/recovery margin; the examples do not implement a separate earlier last-start admission cutoff.
 
 The public `GET /api/v1/games/:appId/scoring/top-score` is an app-wide maximum across completed events and deployments. It is **not** an event leaderboard, weekly standings, cross-game ranking or eligibility feed. Community/browser-submitted scores are a different trust path and must not be mixed into official server-result selection.
 

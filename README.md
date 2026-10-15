@@ -13,6 +13,8 @@ Each game has its own Studio app ID, HTTPS origin, immutable deployment, verifie
 
 Follow the [organizer runbook](docs/organizer-runbook.md) for the complete two-game deployment, recovery and acceptance workflow. It includes the current CLI installation reality, bootstrap app allocation, exact origin registration, verifier/event publication and the optional, separately approved real-mainnet wallet check.
 
+For game implementation and prize integrity, read the [server-verification guide](docs/server-verification.md): the real Worker contract, copy-paste local and bundled-verifier checks, game-specific anti-cheat design, known bot weaknesses, and the manual result-review/payout checklist. Server-verified scores are not proof of human play or automatic prize eligibility.
+
 ### Requirements
 
 - Node.js **22 or newer**, Git, and pnpm **10.11.0** (the repository's declared package manager).
