@@ -26,7 +26,7 @@ async function main(): Promise<void> {
     await writeFile(temporary, archive, { flag: 'wx' });
     await rename(temporary, output);
   } finally { await rm(temporary, { force: true }); }
-  process.stdout.write(`Game: ${configuration.game}\nArchive: ${output}\nSDK: @rareprotocol/connect@0.8.0 (published npm package)\nSHA-256: ${createHash('sha256').update(archive).digest('hex')}\nSize: ${archive.byteLength} bytes\n`);
+  process.stdout.write(`Game: ${configuration.game}\nArchive: ${output}\nSDK: @rareprotocol/connect@0.9.0-beta.0 (published npm package)\nSHA-256: ${createHash('sha256').update(archive).digest('hex')}\nSize: ${archive.byteLength} bytes\n`);
 }
 void main().catch((error: unknown) => {
   process.stderr.write(`Build failed: ${error instanceof Error ? error.message : 'unknown error'}\n`);

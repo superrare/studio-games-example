@@ -4,7 +4,6 @@ import { parseConfiguration } from './config.js';
 import { Credits } from './credits.js';
 import { describeSdkFailure } from './hosted-flow.js';
 import { PaidRound } from './round.js';
-import { ScoringReads } from './scoring.js';
 
 function requiredElement<ElementType extends HTMLElement>(selector: string): ElementType {
   const element = document.querySelector<ElementType>(selector);
@@ -29,7 +28,7 @@ async function main(): Promise<void> {
   requiredElement('.lede').textContent = configuration.game === 'color-match'
     ? 'Choose the color named by the server. Correct matches score; wrong choices do not. Each ten-second round costs one Studio credit.'
     : 'Hit as many moving targets as you can in ten seconds. Each new round costs one Studio credit.';
-  requiredElement('#configuration').textContent = `App ${configuration.appId} · shared credit group ${configuration.groupId} · ${configuration.studioUrl} · published Connect 0.8.0 · popup`;
+  requiredElement('#configuration').textContent = `App ${configuration.appId} · shared credit group ${configuration.groupId} · ${configuration.studioUrl} · published Connect 0.9.0-beta.0 · popup`;
   if (configuration.siblingUrl) {
     const sibling = requiredElement<HTMLAnchorElement>('#sibling-game');
     sibling.href = configuration.siblingUrl;
@@ -48,8 +47,8 @@ async function main(): Promise<void> {
   });
   readAddress = () => client.auth.getSession()?.address;
   const game = client.games.forGame({ appId: configuration.appId, groupId: configuration.groupId });
-  // Server runs and one-time sockets use the hosted game origin, not Studio's
-  // cross-origin API. This client performs only the session-token run write.
+  // Scoring reads, server runs and one-time sockets use the hosted game origin,
+  // not Studio's cross-origin credit API.
   const scoringGame = createSuperRareClient({
     studioUrl: location.origin,
     apiUrl: configuration.apiUrl,
@@ -94,7 +93,7 @@ async function main(): Promise<void> {
   });
   const creditPanel = credits;
   round = new PaidRound({
-    game, scoringGame, scoringReads: new ScoringReads(configuration.appId), variant: configuration.game,
+    game, scoringGame, variant: configuration.game,
     root: requiredElement('#game'), storageKey: `${storageKey}:round`,
     getBalance: async () => {
       await creditPanel.refresh();
@@ -155,7 +154,7 @@ async function main(): Promise<void> {
   const unsubscribe = client.auth.onChange((session) => {
     const nextIdentity = session?.address.toLowerCase();
     if (identity !== undefined && identity !== nextIdentity) {
-      // Discard SDK 0.8.0's in-memory game cache on replacement, not its saved
+      // Discard in-memory game state on wallet replacement, not saved
       // credentials or any wallet's purchase/run recovery records.
       location.reload();
       return;

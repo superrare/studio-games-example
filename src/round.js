@@ -60,10 +60,9 @@ function recoveryMessage(error) {
 }
 
 export class PaidRound {
-  constructor({ game, scoringGame, scoringReads, variant, root, getBalance, getAddress, storageKey }) {
+  constructor({ game, scoringGame, variant, root, getBalance, getAddress, storageKey }) {
     this.game = game;
     this.scoringGame = scoringGame;
-    this.scoringReads = scoringReads;
     this.variant = variant;
     this.root = root;
     this.getBalance = getBalance;
@@ -236,7 +235,7 @@ export class PaidRound {
     const previous = this.state;
     this.clearActions();
     try {
-      const [terms] = await Promise.all([this.game.getTerms(), this.scoringReads.activeEvent()]);
+      const [terms] = await Promise.all([this.game.getTerms(), this.scoringGame.getActiveScoringEvent()]);
       if (terms.credits !== 1) throw new Error('This example requires exactly 1 credit per play. Ask the organizer to correct its terms.');
       if (generation !== this.playActionGeneration || this.storageKey !== accountKey || this.state !== previous) return;
       this.button(`Play · ${terms.credits} credit${terms.credits === 1 ? '' : 's'}`, () => void this.prepareRound(terms.credits));
@@ -262,7 +261,7 @@ export class PaidRound {
     try {
       if (!this.game.getAuthorization()) await this.game.connect();
       const [terms, balance, event] = await Promise.all([
-        this.game.getTerms(), this.getBalance(), this.scoringReads.activeEvent(),
+        this.game.getTerms(), this.getBalance(), this.scoringGame.getActiveScoringEvent(),
       ]);
       if (this.storageKey !== accountKey || this.state !== previous || this.accountStorageKey() !== accountKey) return;
       if (!terms || !balance) throw new Error('Could not read the game terms or credit balance.');
@@ -297,7 +296,7 @@ export class PaidRound {
     const key = replacementKey ?? newKey();
     let run;
     try {
-      const activeEvent = eventId ?? (await this.scoringReads.activeEvent()).eventId;
+      const activeEvent = eventId ?? (await this.scoringGame.getActiveScoringEvent()).eventId;
       run = {
         eventId: activeEvent, key: await serverRunKey(key),
         serverTick: -1, inputSeq: 0, inputTick: -1, pendingInputs: [],
@@ -783,7 +782,7 @@ export class PaidRound {
     this.leaderboardTable.setAttribute('aria-busy', 'true');
     this.leaderboardStatus.textContent = 'Loading scores…';
     try {
-      const entries = await this.scoringReads.leaderboard();
+      const entries = await this.scoringGame.getServerLeaderboard();
       if (generation !== this.leaderboardGeneration) return;
       const rows = entries.map((entry) => {
         const row = element('tr');

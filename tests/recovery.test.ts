@@ -45,8 +45,10 @@ test('uncertain paid start and server-run retry retain original keys, event, and
   };
   const options = {
     game,
-    scoringGame: { startServerValidatedRun: async (request: RunRequest) => { runs.push(request); throw new Error('lost run response'); } },
-    scoringReads: { activeEvent: async () => { throw new Error('must not rediscover event during recovery'); } },
+    scoringGame: {
+      startServerValidatedRun: async (request: RunRequest) => { runs.push(request); throw new Error('lost run response'); },
+      getActiveScoringEvent: async () => { throw new Error('must not rediscover event during recovery'); },
+    },
     variant: 'color-match', root: null, getBalance: () => ({ available: 10 }), getAddress: () => address, storageKey: 'test',
   };
   round = new RoundHarness(options);
@@ -83,7 +85,7 @@ test('wallet replacement during consent never starts or transfers the old wallet
     requestConsent: async () => { currentAddress = '0x2222222222222222222222222222222222222222'; return { consent: {} }; },
     startWithConsent: async () => { starts += 1; throw new Error('must never run'); },
   };
-  round = new RoundHarness({ game, scoringGame: {}, scoringReads: {}, variant: 'target-rush', root: null, getBalance: () => ({ available: 10 }), getAddress: () => currentAddress, storageKey: 'test' });
+  round = new RoundHarness({ game, scoringGame: {}, variant: 'target-rush', root: null, getBalance: () => ({ available: 10 }), getAddress: () => currentAddress, storageKey: 'test' });
   round.storageKey = round.accountStorageKey();
   const originalStorageKey = round.storageKey;
   await round.confirmRound(terms, 'original-paid-key', eventId);
@@ -108,7 +110,7 @@ test('memory-only consent never sends a paid start and retains the original atte
     recoverStart: async () => { recoveries += 1; throw new Error('Lost recovery response'); },
   };
   const round = new RoundHarness({
-    game, scoringGame: {}, scoringReads: {}, variant: 'target-rush', root: null,
+    game, scoringGame: {}, variant: 'target-rush', root: null,
     getBalance: () => ({ available: 10 }), getAddress: () => address, storageKey: 'test',
   });
   round.storageKey = round.accountStorageKey();
