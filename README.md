@@ -1,111 +1,70 @@
-# Studio games example
+# Cloudline Arcade
 
-Two distinct browser games built from one public repository, using the published **`@rareprotocol/connect@0.9.0-beta.0`** npm package, pinned exactly with its lockfile:
+Two original browser games share one Studio credit group through the published **`@rareprotocol/connect@0.9.0-beta.0`** SDK:
 
-- **Target Rush:** click server-issued targets before the round ends.
-- **Color Match:** choose the server-requested color. A wrong choice does not earn a point.
+- **Sky Hopper:** Flappy Bird-style obstacle flight.
+- **Star Runner:** an original platformer with three levels.
 
-Each game has its own Studio app ID, HTTPS origin, immutable deployment, verifier version and scoring event. Register both apps in **one credit group** to share the same wallet's purchased balance. The example offer is **0.01 USDC for 10 credits on Ethereum mainnet**, with **1 credit per play**. Ethereum network fees are separate and can exceed the pack price.
+Each game has a separate Studio app and HTTPS origin; both attach to the same wallet balance. Each play costs **1 credit**. The configured purchase pack is **$0.10 USDC for 10 credits** on Ethereum mainnet. Network fees are separate and may exceed the pack price.
 
-**This is real payment integration, not a faucet or simulated balance.** Building, previewing, deploying and configuring scoring do not authorize a wallet transfer. Login, buying credits and spending a credit are separate, explicit player actions. Only a completed server result is official. Prizes and contest adjudication remain manual organizer responsibilities; these games are not bot-proof.
+These are real payment integrations, not demos or faucets. Sign-in, purchases, and paid starts remain separate explicit actions. Only the completed result from the pinned server verifier is official. Deterministic server rules prevent browser score forgery; they cannot prove that a valid player input came from a human. Bots, multi-wallet abuse, and contest eligibility need separate controls and manual organizer review. Do not describe these games as bot-proof.
 
-## Start here
+## Setup
 
-Follow the [organizer runbook](docs/organizer-runbook.md) for the complete two-game deployment, recovery and acceptance workflow. It includes the current CLI installation reality, bootstrap app allocation, exact origin registration, verifier/event publication and the optional, separately approved real-mainnet wallet check.
-
-For game implementation and prize integrity, read the [server-verification guide](docs/server-verification.md): the real Worker contract, copy-paste local and bundled-verifier checks, game-specific anti-cheat design, known bot weaknesses, and the manual result-review/payout checklist. Server-verified scores are not proof of human play or automatic prize eligibility.
-
-### Requirements
-
-- Node.js **22 or newer**, Git, and pnpm **10.11.0** (the repository's declared package manager).
-- A Studio creator account and the feature-enabled `rare-profile` CLI for deployment. The runbook pins the merged source commit while the required beta is not yet published to npm.
-- For an explicitly approved paid check only: a wallet with Ethereum USDC and sufficient Ethereum gas, and a treasury the organizer controls.
+Requirements: Node.js 22+, Git, and pnpm 10.11.0.
 
 ```sh
-git clone https://github.com/superrare/studio-games-example.git
-cd studio-games-example
 corepack enable
 corepack prepare pnpm@10.11.0 --activate
-pnpm install
-```
-
-The dependency is a published npm release; no Connect SDK checkout, branch build, private registry or Privy application secret is needed.
-
-### Configure and build
-
-Copy `examples/target-rush.example.json` and `examples/color-match.example.json` into your own config files. Replace all placeholder identities and origins with the values allocated by the runbook. The example files are not live deployments and must not be used unchanged.
-
-A per-game public configuration has this shape:
-
-```json
-{
-  "appId": "<this-game-studio-app-uuid>",
-  "groupId": "<your-shared-credit-group-uuid>",
-  "studioUrl": "https://studio.superrare.com",
-  "apiUrl": "https://api.superrare.com",
-  "connectUrl": "https://connect.superrare.com",
-  "appOrigin": "https://<this-games-exact-hostname>",
-  "display": "popup",
-  "game": "target-rush"
-}
-```
-
-For the second game, set `game` to `color-match`, use its different `appId` and `appOrigin`, and keep the same `groupId`. Optional `siblingUrl` links to the other game's HTTPS page. Never put a treasury override, wallet key, creator token, session credential or service secret in this config: payment terms come from Studio's authoritative quote.
-
-```sh
-pnpm build -- --config ./target-rush.config.json --output ./dist/target-rush.zip
-pnpm build -- --config ./color-match.config.json --output ./dist/color-match.zip
-```
-
-An existing output is not overwritten unless you explicitly add `--force`. Each ZIP contains these paths at its root, not inside an enclosing directory:
-
-```text
-index.html
-config.json
-assets/
-server-verifier.js
-scoring-config.json
-```
-
-Keep the game client, verifier and scoring configuration together. The build selects the game variant and emits its matching scoring config (`maxTicks: 240`, `roundTicks: 200`). Uploading the ZIP does **not** itself create a scoring event. Studio provisions the root verifier privately rather than serving it as a public static asset.
-
-### Local development and checks
-
-```sh
-pnpm dev -- --config ./target-rush.config.json
-# Optional: --port 4173
+pnpm install --frozen-lockfile
 pnpm typecheck
 pnpm test
 ```
 
-Local HTTP is for development, not paid-flow acceptance: Studio registers exact **HTTPS** app origins, and a local page is not your registered deployed origin. Do not loosen origin checks or treat a local score as an official result. Use the deployed HTTPS app for the unpaid Connect smoke and separately approved mainnet payment/play checks.
+Read the [organizer runbook](docs/organizer-runbook.md) before registering a game or treasury. You must own or be authorized to register both Studio apps, have their final HTTPS origins, and choose a treasury you control. The safe setup preview performs no remote command, file write, deployment, or payment:
 
-## Integration boundaries
+```sh
+pnpm setup:group -- --treasury <controlled-ethereum-address> --slug <unique-group-slug> \
+  --flappy-app <app-uuid> --flappy-origin https://<flappy-host> \
+  --platformer-app <app-uuid> --platformer-origin https://<platformer-host>
+```
 
-- Published Connect 0.9.0-beta.0 supplies popup authentication, scoped group credits, payment intents, explicit paid-start consent/recovery, server-run start and authoritative scoring reads. Sign-in uses `auth.login()`; `game.connect()` then authorizes through the Studio API without opening another hosted flow. The SDK supports opt-in embedding, but these examples deliberately keep popup authentication.
-- The example calls the SDK's `getActiveScoringEvent()` and `getServerLeaderboard()` on the deployed game's own origin. Its server-run client uses that origin too, so WebSocket tickets are used on the correct host. Credit operations use canonical Studio. No copied scoring HTTP client or SDK checkout is required.
-- Saved purchase, consent, paid-start, server-run and completion records are recovery evidence, not permission to initiate another payment or charge. Preserve original keys after uncertain outcomes and keep records scoped to wallet, group, app and origin.
-- Unreadable purchase recovery records block replacement purchases instead of treating the old payment as absent. Memory-only consent blocks paid start until durable recovery is restored. JavaScript/CSS asset names are content-hashed for Studio's immutable asset cache.
-- A fresh account starts with zero purchased credits. No seeded credits, automatic grants, free paid-start fallback or automated prize payouts are included.
+Review the displayed mainnet commands, app identities, origins, and treasury. Append `--apply` only when you intend to create the live-capable group and immediately register both apps. Registration gates ordinary unpaid starts on those apps. The script verifies 100000 atomic USDC / 10 credits and 1 credit per app; it does not deploy apps, publish scoring events, purchase credits, or authorize wallet transfers. It writes ignored `flappy-bird.config.json` and `platformer.config.json` files. Preserve the returned group ID; do not blindly rerun after a partial CLI failure.
 
-## Publishing and contest operations
+Build the two artifacts:
 
-Update the **same apps** after bootstrap rather than allocating replacement identities. Every scoring deployment needs its root verifier, matching verifier version and an event pinned to that deployment. Group membership survives an update; scoring readiness does not automatically migrate. See the [runbook's publishing and update steps](docs/organizer-runbook.md#6-publish-a-verifier-version-and-scoring-event).
+```sh
+pnpm build -- --config ./flappy-bird.config.json --output ./dist/flappy-bird.zip
+pnpm build -- --config ./platformer.config.json --output ./dist/platformer.zip
+```
 
-The public top score spans completed events/builds for an app. It is not an event standings table, weekly winner list, combined-game ranking or prize calculator. Organizers must establish contest windows, eligibility, tie-breaking, result review, prize funding and fulfillment separately.
+The example configurations under `examples/` contain placeholders and are not deployable. Each ZIP has `index.html`, `config.json`, hashed `assets/`, root `server-verifier.js`, and variant-matched `scoring-config.json`. Defaults are 1400/1200 ticks for Sky Hopper and 2600/2400 ticks for Star Runner. Building does not publish an app or enable scoring; follow the runbook to update the allocated apps and publish a deployment-pinned verifier/event.
 
-## Live integration check — 2026-10-15
+For a static local preview, use either generated config:
 
-- [Target Rush](https://y4prnpya.srstudio.dev)
-- [Color Match](https://q3s9bpab.srstudio.dev)
+```sh
+pnpm dev -- --config ./flappy-bird.config.json
+# or: pnpm dev -- --config ./platformer.config.json --port 4173
+```
 
-These are mainnet integration-test deployments, not free-play demos. Both use one enabled credit group at **0.01 USDC / 10 credits**, **1 credit / round**, and have separate deployment-pinned verifiers and authenticated scoring events. Do not send money merely to inspect the example.
+Local HTTP cannot exercise official paid starts or server sockets. Never treat preview scores as official.
 
-The source now uses the published Connect beta. These URLs still represent the original 0.8.0 deployments until the organizer rebuilds, redeploys and republishes their deployment-pinned verifier/events using the runbook; changing the dependency does not update live games automatically.
+## Verification and operations
 
-Original 0.8.0 deployment check: both artifact builds, typecheck, 13 focused regressions, both packaged verifier rounds (including rejection of a wrong color), production verifier conformance/event publication, live active-event and empty server-leaderboard reads, desktop/mobile signed-out rendering, hosted Connect sign-in surfaces with the correct initiating origin, and cancellation without payment or paid-start requests.
+The platform owns player identity, credit authorization, paid-run admission, input ordering, server time, verifier state, and final score. The browser sends only strict game inputs; the Worker derives movement, collisions, level progress, and points from server-owned state. Public snapshots omit the private random generator state. Game code and score-critical rules are deterministic and bounded.
 
-Not yet exercised: completed player authentication, a real USDC transfer/claim, paid rounds, and the purchased-balance transition across both games. Those require the payer's explicit wallet approval; creator deployment credentials are not a substitute. Follow the runbook's separately approved mainnet acceptance checklist before treating this as payment/gameplay acceptance.
+Read [server verification and abuse limits](docs/server-verification.md) before prize use. Server verification makes score tampering harder, not legal automation impossible: a bot can still send valid inputs, and a wallet does not establish one unique human. Use conservative stakes, published contest rules, independent review, and manual winner/payout decisions.
+
+## Current Studio deployment
+
+Both apps are deployed at their permanent HTTPS origins and registered in one shared mainnet credit group:
+
+- **Sky Hopper:** app `f89bd492-1479-46ff-b455-1ec479e45684` · [tu9zzywe.srstudio.dev](https://tu9zzywe.srstudio.dev) · current deployment `f2698cec-1ac6-421a-98d3-484c968a9962` · event `146272af-4938-4ef7-8ddf-77ec6badbbdd`.
+- **Star Runner:** app `7d0a34a0-ca86-413a-871c-7b731adf4511` · [q77e66pg.srstudio.dev](https://q77e66pg.srstudio.dev) · current deployment `ea39fb1d-adfe-4e9a-8db3-6729a43ad9cf` · event `7d6d0f8d-98db-46ec-aae9-1140e2392ba9`.
+
+Group `8020b761-b30e-41a5-9f14-8c82728cfdb2` is configured for canonical Ethereum USDC at **$0.10 / 10 credits**, with each app costing **1 credit per play**. Both authenticated server-scoring events are active with a 20-attempt per-identity limit. Sign-in and hosted wallet checkout open in embedded Connect modals. The group and event setup is live-capable, but no wallet purchase or paid gameplay was exercised. Buying credits transfers real USDC to the configured treasury; don't purchase merely to inspect the games. Local app configs are ignored and contain the shared group binding.
+
+The public leaderboard is app-level; it is not a combined-game ranking or contest result. Bot-resistance and manual prize-review limits are described above and in the [verification guide](docs/server-verification.md).
 
 ## License
 

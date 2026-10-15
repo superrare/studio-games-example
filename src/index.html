@@ -3,16 +3,16 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="Two server-verified Studio credit games using the published SuperRare Connect SDK.">
-    <title>Studio games · Real shared credits</title>
+    <meta name="description" content="Cloudline Arcade: Sky Hopper and Star Runner, two original server-verified games sharing Studio credits.">
+    <title>Cloudline Arcade · Studio credits</title>
     <link rel="stylesheet" href="./assets/styles.css">
   </head>
   <body>
     <main>
-      <p class="eyebrow">SuperRare Connect · Studio game example</p>
-      <h1>Studio games</h1>
+      <p class="eyebrow">Cloudline Arcade · Powered by SuperRare Connect</p>
+      <h1>Cloudline Arcade</h1>
       <p class="lede">Loading organizer configuration…</p>
-      <p class="payment-notice"><strong>Ethereum mainnet · real USDC, not demo money.</strong> $0.01 USDC buys 10 credits; each play uses 1 credit. Network fees may apply. Both games use your shared group balance. Organizer prizes are handled manually.</p>
+      <p class="payment-notice"><strong>Ethereum mainnet · real USDC, not demo money.</strong> $0.10 USDC buys 10 credits; each play uses 1 credit. Network fees may apply. Sky Hopper and Star Runner use your shared group balance. Organizer prizes are handled manually.</p>
       <nav aria-label="Other game"><a id="sibling-game" hidden></a></nav>
       <section class="layout" aria-label="Game and account">
         <section class="card game-card" id="game" aria-label="Paid game"></section>
@@ -43,6 +43,14 @@
         </table>
       </section>
     </main>
+    <dialog id="connect-modal" aria-labelledby="connect-modal-title" aria-describedby="connect-modal-status">
+      <header class="connect-modal__header">
+        <h2 id="connect-modal-title">SuperRare Connect</h2>
+        <button id="connect-close" class="secondary" type="button">Close</button>
+      </header>
+      <p id="connect-modal-status" role="status" aria-live="polite">Sign-in and payment approvals happen only after you choose an action.</p>
+      <div id="connect-embed"></div>
+    </dialog>
     <script type="module" src="./assets/app.js"></script>
   </body>
 </html>

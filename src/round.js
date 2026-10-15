@@ -1,5 +1,6 @@
 // Adapted from @rareprotocol/connect examples/target-game (MIT, Copyright 2026 SuperRare).
-import { applyInput, parseSavedRound, targetSnapshotSchema, targetStateSchema } from './target-engine.js';
+import { parseSavedRound, gameSnapshotSchema, gameViewSchema, gameStateSchema, view } from './game-engine.js';
+import { GameView } from './game-view.js';
 
 const TICK_MILLISECONDS = 50;
 const MAX_PENDING_INPUTS = 32;
@@ -75,7 +76,7 @@ export class PaidRound {
     this.actionNode = null;
     this.arena = null;
     this.arenaMessage = null;
-    this.target = null;
+    this.gameView = null;
     this.scoreNode = null;
     this.leaderboardStatus = null;
     this.leaderboardTable = null;
@@ -96,7 +97,7 @@ export class PaidRound {
 
   render() {
     this.root.replaceChildren();
-    this.root.append(element('h2', this.variant === 'color-match' ? 'Match the color' : 'Hit the target'));
+    this.root.append(element('h2', this.variant === 'flappy-bird' ? 'Sky Hopper' : 'Star Runner · Three worlds'));
     this.statusNode = element('p', 'Checking game access…', 'game-status');
     this.statusNode.setAttribute('role', 'status');
     this.root.append(this.statusNode);
@@ -108,31 +109,14 @@ export class PaidRound {
     this.leaderboardRefreshButton = document.querySelector('#refresh-leaderboard');
     this.leaderboardRefreshButton.addEventListener('click', () => { void this.refreshLeaderboard(); });
     this.arena = element('div', undefined, 'arena');
-    this.arena.setAttribute('aria-label', this.variant === 'color-match' ? 'Color Match arena' : 'Target Rush arena');
+    this.arena.setAttribute('aria-label', this.variant === 'flappy-bird' ? 'Sky Hopper arena' : 'Star Runner arena');
     this.arenaMessage = element('p', 'Start a round to play.', 'arena-message');
-    this.target = element('button', '', 'target');
-    this.target.id = 'target';
-    this.target.type = 'button';
-    this.target.setAttribute('aria-label', 'Hit the target');
-    this.target.hidden = true;
-    this.target.addEventListener('click', () => this.hitTarget());
-    this.arena.append(this.arenaMessage, this.target);
-    this.colorPanel = element('div', undefined, 'color-panel');
-    this.colorPanel.hidden = true;
-    this.colorPrompt = element('p', '', 'color-prompt');
-    this.colorPrompt.id = 'desired-color';
-    this.colorPrompt.setAttribute('aria-live', 'polite');
-    const choices = element('div', undefined, 'color-choices');
-    for (const color of ['red', 'blue', 'green', 'gold']) {
-      const choice = element('button', color, `color-choice color-${color}`);
-      choice.type = 'button';
-      choice.dataset.color = color;
-      choice.setAttribute('aria-label', `Choose ${color}`);
-      choice.addEventListener('click', () => this.chooseColor(color));
-      choices.append(choice);
-    }
-    this.colorPanel.append(this.colorPrompt, choices);
-    this.arena.append(this.colorPanel);
+    this.gameView = new GameView({
+      root: this.arena,
+      variant: this.variant,
+      onInput: (input) => this.sendControl(input),
+    });
+    this.arena.append(this.arenaMessage);
     this.root.append(this.arena);
     this.root.append(this.scoreNode);
     this.actionNode = element('div', undefined, 'game-actions');
@@ -188,7 +172,7 @@ export class PaidRound {
     if (key === this.storageKey && (this.socket || this.runConnecting || this.completing || this.startingRound)) return;
     this.disconnectRun();
     this.clearActions();
-    this.target.hidden = true;
+    this.gameView?.reset();
     this.arenaMessage.hidden = false;
     if (!key) {
       this.storageKey = null;
@@ -478,7 +462,7 @@ export class PaidRound {
         endedAt: Date.now(),
       }));
     } catch { /* Keep the active record when diagnostic storage is unavailable. */ }
-    this.target.hidden = true;
+    this.gameView?.reset();
     this.arenaMessage.hidden = false;
     this.arenaMessage.textContent = diagnostic;
     this.state.phase = 'terminal';
@@ -492,7 +476,7 @@ export class PaidRound {
   disconnectRun() {
     clearInterval(this.timer);
     clearTimeout(this.connectTimer);
-    if (this.colorPanel) this.colorPanel.hidden = true;
+    this.gameView?.reset();
     this.timer = null;
     this.connectTimer = null;
     this.runConnecting = false;
@@ -529,7 +513,10 @@ export class PaidRound {
         || (attempt.run.configDigest && run.configDigest !== attempt.run.configDigest)) {
         throw new Error('The platform returned a different run or verifier for this paid play.');
       }
-      const initialView = targetStateSchema.parse(run.state);
+      const initialProjection = gameViewSchema.safeParse(run.state);
+      const initialView = initialProjection.success
+        ? initialProjection.data
+        : view(gameStateSchema.parse(run.state));
       if (initialView.rules.game !== this.variant) throw new Error('The server verifier does not match this game variant.');
       const socketUrl = new URL(run.webSocketUrl);
       const expectedProtocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -557,7 +544,7 @@ export class PaidRound {
       socket.addEventListener('message', (event) => {
         if (!ownsSocket()) return;
         try {
-          this.acceptSnapshot(targetSnapshotSchema.parse(JSON.parse(event.data)));
+          this.acceptSnapshot(gameSnapshotSchema.parse(JSON.parse(event.data)));
         } catch (error) {
           this.showRunError(error);
         }
@@ -595,8 +582,7 @@ export class PaidRound {
         return;
       }
       if (packet.error === 'RUN_FINISHED') {
-        this.colorPanel.hidden = true;
-        this.target.hidden = true;
+        this.gameView?.render({ ...this.state.run.view, gameOver: true });
         this.announce('Waiting for the platform’s recorded result…');
         return;
       }
@@ -631,7 +617,7 @@ export class PaidRound {
       this.state.phase = 'finalizing';
       this.save();
       this.disconnectRun();
-      this.target.hidden = true;
+      this.gameView?.render(packet.state);
       this.arenaMessage.hidden = false;
       this.arenaMessage.textContent = `Server-verified score: ${packet.result.score}. Completing this paid round…`;
       void this.submitAndComplete();
@@ -650,11 +636,9 @@ export class PaidRound {
   }
 
   reconcilePrediction() {
-    let predicted = this.state.run.view;
-    for (const pending of this.state.run.pendingInputs) {
-      predicted = applyInput(predicted, pending.input, Math.max(predicted.tick, this.state.run.serverTick));
-    }
-    this.predictedView = predicted;
+    // Public snapshots omit private randomness. Render only server-owned state;
+    // pending controls never create a predicted official score.
+    this.predictedView = this.state.run.view;
   }
 
   queueInput(input) {
@@ -684,20 +668,10 @@ export class PaidRound {
     }
   }
 
-  hitTarget() {
+  sendControl(input) {
     if (this.state?.phase !== 'playing' || !this.predictedView?.started || this.predictedView.gameOver) return;
     try {
-      this.queueInput({ action: 'hit', targetId: this.predictedView.target.id });
-    } catch (error) {
-      this.showRunError(error);
-    }
-  }
-
-  chooseColor(color) {
-    if (this.variant !== 'color-match' || this.state?.phase !== 'playing'
-      || !this.predictedView?.started || this.predictedView.gameOver) return;
-    try {
-      this.queueInput({ action: 'choose', targetId: this.predictedView.target.id, color });
+      this.queueInput(input);
     } catch (error) {
       this.showRunError(error);
     }
@@ -706,38 +680,22 @@ export class PaidRound {
   renderRun() {
     const view = this.predictedView;
     if (!view) return;
+    this.gameView?.render(view);
     const remainingTicks = view.startTick === null ? view.rules.roundTicks
-      : Math.max(0, view.rules.roundTicks - (this.estimatedServerTick() - view.startTick));
-    this.target.hidden = !view.started || view.gameOver || remainingTicks <= 0;
-    this.target.disabled = this.state.run.pendingInputs.length >= MAX_PENDING_INPUTS;
-    this.arenaMessage.hidden = !this.target.hidden;
-    this.arenaMessage.textContent = view.gameOver || remainingTicks <= 0
+      : Math.max(0, Math.min(view.rules.maxTicks, view.startTick + view.rules.roundTicks) - this.estimatedServerTick());
+    this.arenaMessage.hidden = view.started && !view.gameOver;
+    this.arenaMessage.textContent = view.gameOver
       ? 'Waiting for the platform’s recorded result…' : 'Starting your server-validated round…';
-    const maxX = Math.max(0, this.arena.clientWidth - this.target.offsetWidth);
-    const maxY = Math.max(0, this.arena.clientHeight - this.target.offsetHeight);
-    this.target.style.left = `${view.target.x * maxX}px`;
-    this.target.style.top = `${view.target.y * maxY}px`;
-    const active = view.started && !view.gameOver && remainingTicks > 0;
-    if (this.variant === 'color-match') {
-      this.target.hidden = true;
-      this.colorPanel.hidden = !active;
-      this.arenaMessage.hidden = active;
-      this.colorPrompt.textContent = `Choose ${view.target.color.toUpperCase()}`;
-      this.colorPrompt.dataset.color = view.target.color;
-      for (const choice of this.colorPanel.querySelectorAll('button')) {
-        choice.disabled = !active || this.state.run.pendingInputs.length >= MAX_PENDING_INPUTS;
-      }
-    }
-    this.scoreNode.textContent = `Score: ${view.score}${this.state.run.pendingInputs.length ? ' (pending server confirmation)' : ''}`;
+    this.scoreNode.textContent = `Server score: ${view.score}`;
     this.announce(view.gameOver || remainingTicks <= 0
       ? 'Waiting for the platform’s recorded result…'
-      : `Time left: ${(remainingTicks * TICK_MILLISECONDS / 1000).toFixed(1)}s`);
+      : `${this.variant === 'platformer' ? `Level ${view.platform.level + 1}/3 · ` : ''}Time left: ${(remainingTicks * TICK_MILLISECONDS / 1000).toFixed(1)}s`);
     this.clearActions();
   }
 
   showRunError(error) {
     this.disconnectRun();
-    this.target.hidden = true;
+    this.gameView?.reset();
     this.arenaMessage.hidden = false;
     this.arenaMessage.textContent = 'Continue reconnects this same paid round; its server clock does not restart.';
     this.showRecoveryError(error, 'Game connection interrupted. Continue recovers this same paid round without using another credit.');
@@ -749,7 +707,7 @@ export class PaidRound {
     const accountKey = this.storageKey;
     this.completing = true;
     this.clearActions();
-    this.target.hidden = true;
+    if (this.state.run?.view) this.gameView?.render({ ...this.state.run.view, gameOver: true });
     this.announce(`The platform recorded verified score ${attempt.result.score}. Completing this round…`);
     try {
       this.save();

@@ -1,66 +1,55 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { advance, applyInput, createRun, isFinished, parseSavedRound, score, targetStateSchema } from '../src/target-engine.js';
+import { createRun, gameConfigSchema, gameStateSchema, gameViewSchema, view } from '../src/game-engine.js';
 import verifier from '../src/server-verifier.js';
 
-for (const game of ['target-rush', 'color-match'] as const) {
-  test(`${game}: server time owns start, deadline, and final score`, () => {
-    const initial = createRun(123, { game, maxTicks: 240, roundTicks: 200 });
-    assert.equal(applyInput(initial, { action: 'hit', targetId: 1 }, 1).score, 0);
-    const started = applyInput(initial, { action: 'start' }, 2);
-    const input = game === 'color-match'
-      ? { action: 'choose', targetId: started.target.id, color: started.target.color }
-      : { action: 'hit', targetId: started.target.id };
-    const hit = applyInput(started, input, 3);
-    assert.equal(score(hit), 1);
-    assert.equal(applyInput(hit, input, 4).score, 1, 'replayed target cannot score twice');
-    const end = advance(hit, 202);
-    assert.equal(isFinished(end), true);
-    assert.equal(score(applyInput(end, input, 203)), 1);
-    assert.equal(advance(initial, 240).gameOver, true, 'a never-started run still expires');
-    assert.throws(() => advance(hit, 1), /backwards/);
-    assert.deepEqual(targetStateSchema.parse(hit), hit);
-  });
-}
-
-test('Color Match rejects wrong color, forged hit action, stale ID, extra score, and unstarted input', () => {
-  const initial = createRun(456, { game: 'color-match', maxTicks: 240, roundTicks: 200 });
-  const started = applyInput(initial, { action: 'start' }, 0);
-  const wrong = started.target.color === 'red' ? 'blue' : 'red';
-  for (const input of [
-    { action: 'choose', targetId: started.target.id, color: wrong },
-    { action: 'hit', targetId: started.target.id },
-    { action: 'choose', targetId: started.target.id + 1, color: started.target.color },
-    { action: 'choose', targetId: started.target.id, color: started.target.color, score: 999 },
-  ]) assert.equal(applyInput(started, input, 1).score, 0);
-  assert.equal(applyInput(initial, { action: 'choose', targetId: 1, color: initial.target.color }, 1).score, 0);
-  const correct = applyInput(started, { action: 'choose', targetId: 1, color: started.target.color }, 1);
-  assert.equal(correct.score, 1);
-  assert.equal(correct.target.id, 2);
-  assert.equal(applyInput(correct, { action: 'start' }, 2).startTick, 0, 'start cannot extend a round');
+test('server verifier runs both configured variants and keeps private state out of public views', async () => {
+  async function call(op: string, fields: Record<string, unknown>, expectedStatus = 200): Promise<unknown> {
+    const response = await verifier.fetch(new Request('https://verifier.invalid/v1', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ version: 1, op, ...fields }),
+    }));
+    assert.equal(response.status, expectedStatus);
+    return response.json();
+  }
+  for (const config of [
+    { game: 'flappy-bird', maxTicks: 1400, roundTicks: 1200 },
+    { game: 'platformer', maxTicks: 2600, roundTicks: 2400 },
+  ]) {
+    const response = await call('createRun', { seed: 42, config }) as { result: unknown };
+    const state = gameStateSchema.parse(response.result);
+    assert.equal(state.rules.game, config.game);
+    assert.deepEqual(state, createRun(42, config));
+    const publicView = view(state);
+    assert.equal('rngState' in publicView, false);
+    assert.equal('lastInputTick' in publicView, false);
+    assert.deepEqual(gameViewSchema.parse(publicView), publicView);
+    await call('view', { state: publicView }, 400);
+    await call('submitScore', { score: 999999 }, 400);
+  }
+  await call('createRun', { seed: 1, config: { game: 'target-rush', maxTicks: 240, roundTicks: 200 } }, 400);
+  await call('createRun', { seed: 1, config: { game: 'platformer', maxTicks: 2601, roundTicks: 200 } }, 400);
+  const malformed = await verifier.fetch(new Request('https://verifier.invalid/v1', { method: 'POST', body: '{invalid' }));
+  assert.equal(malformed.status, 400);
+  const otherPath = await verifier.fetch(new Request('https://verifier.invalid/other'));
+  assert.equal(otherPath.status, 404);
+  assert.equal(gameConfigSchema.safeParse({ game: 'flappy-bird', maxTicks: 1, roundTicks: 2 }).success, false);
 });
 
-test('Target Rush rejects Color Match inputs and arbitrary client score claims', () => {
-  const started = applyInput(createRun(123, { game: 'target-rush', maxTicks: 240, roundTicks: 200 }), { action: 'start' }, 0);
-  assert.equal(applyInput(started, { action: 'choose', targetId: 1, color: started.target.color }, 1).score, 0);
-  assert.equal(applyInput(started, { action: 'hit', targetId: 1, score: 5000 }, 1).score, 0);
-});
-
-test('verifier implements real Workers request protocol and rejects malformed state', async () => {
-  const response = await verifier.fetch(new Request('https://verifier.invalid/v1', {
-    method: 'POST', body: JSON.stringify({ version: 1, op: 'createRun', seed: 42, config: { game: 'color-match', maxTicks: 240, roundTicks: 200 } }),
-  }));
-  assert.equal(response.status, 200);
-  const payload: unknown = await response.json();
-  assert.ok(typeof payload === 'object' && payload !== null && 'result' in payload);
-  const state = targetStateSchema.parse(payload.result);
-  assert.equal(state.rules.game, 'color-match');
-  assert.equal((await verifier.fetch(new Request('https://verifier.invalid/v1', { method: 'POST', body: '{invalid' }))).status, 400);
-  assert.equal((await verifier.fetch(new Request('https://verifier.invalid/other'))).status, 404);
-});
-
-test('saved round parser rejects missing original paid/run keys and old client-scored records', () => {
-  assert.throws(() => parseSavedRound({ version: 1, phase: 'playing', score: 999 }));
-  assert.throws(() => parseSavedRound({ version: 2, phase: 'pending', key: 'valid-key' }));
-  assert.throws(() => createRun(123, { game: 'target-rush', maxTicks: 100, roundTicks: 200 }));
+test('verifier applies server-authoritative input, not browser position or score claims', async () => {
+  async function apply(state: unknown, input: unknown, serverTick: number): Promise<unknown> {
+    const response = await verifier.fetch(new Request('https://verifier.invalid/v1', {
+      method: 'POST', body: JSON.stringify({ version: 1, op: 'applyInput', state, input, serverTick }),
+    }));
+    assert.equal(response.status, 200);
+    return (await response.json()).result;
+  }
+  const initial = createRun(42, { game: 'platformer', maxTicks: 2600, roundTicks: 2400 });
+  const started = await apply(initial, { action: 'start' }, 0);
+  assert.equal(gameStateSchema.parse(started).score, 0);
+  const forged = await apply(started, { action: 'move', direction: 1, jump: false, score: 999, x: 800 }, 1);
+  assert.equal(gameStateSchema.parse(forged).score, 0);
+  assert.equal(gameStateSchema.parse(forged).platform.x, 30);
+  const moved = await apply(started, { action: 'move', direction: 1, jump: false }, 1);
+  assert.equal(gameStateSchema.parse(moved).platform.direction, 1);
 });

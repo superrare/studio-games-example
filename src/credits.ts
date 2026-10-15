@@ -61,8 +61,11 @@ function formatPrice(atomic: string): string {
   if (!/^\d+$/.test(String(atomic))) return 'an amount shown by the wallet';
   const value = BigInt(atomic);
   const whole = value / 1_000_000n;
-  const fraction = String(value % 1_000_000n).padStart(6, '0').replace(/0+$/, '');
-  return `$${whole}${fraction ? `.${fraction}` : ''} USDC`;
+  const fractional = value % 1_000_000n;
+  const fraction = fractional === 0n ? '00'
+    : fractional % 10_000n === 0n ? String(fractional / 10_000n).padStart(2, '0')
+    : String(fractional).padStart(6, '0').replace(/0+$/, '');
+  return `$${whole}.${fraction} USDC`;
 }
 
 function errorMessage(error: unknown): string {
@@ -368,8 +371,8 @@ export class Credits {
       const authorization = this._authorization();
       if (!authorization) throw new Error('Connect a game wallet before buying credits.');
       if (quote.chainId !== 1) throw new Error('This example only accepts Ethereum mainnet credit quotes.');
-      if (quote.packPriceAtomic !== '10000' || quote.packCredits !== 10) {
-        throw new Error('This example requires $0.01 USDC for 10 credits. Ask the organizer to correct the payment configuration.');
+      if (quote.packPriceAtomic !== '100000' || quote.packCredits !== 10) {
+        throw new Error('This arcade requires $0.10 USDC for 10 credits. Ask the organizer to correct the payment configuration.');
       }
       if (quote.usdcAddress.toLowerCase() !== MAINNET_USDC) {
         throw new Error('The credit quote does not use the configured Ethereum mainnet USDC contract. No payment was started.');
@@ -433,7 +436,7 @@ export class Credits {
       this._say('This quote expired before payment. Cancel it and request a fresh quote; no transfer was started.');
       return;
     }
-    if (quote.chainId !== 1 || quote.packPriceAtomic !== '10000' || quote.packCredits !== 10 || quote.usdcAddress.toLowerCase() !== MAINNET_USDC || quote.address.toLowerCase() !== authorization.address) {
+    if (quote.chainId !== 1 || quote.packPriceAtomic !== '100000' || quote.packCredits !== 10 || quote.usdcAddress.toLowerCase() !== MAINNET_USDC || quote.address.toLowerCase() !== authorization.address) {
       this._say('This quote no longer matches the connected mainnet wallet. No payment was started.');
       return;
     }
@@ -443,7 +446,7 @@ export class Credits {
       // Keep the exact quote and an ambiguous-outcome marker durable before the SDK opens hosted checkout.
       const pending = { ...record, confirmPayment: false, outcomeUnknown: true };
       this._saveRecord(pending);
-      this._say('Opening hosted wallet checkout in a popup. No transfer is submitted until the hosted wallet asks for explicit approval.');
+      this._say('Opening hosted wallet checkout in an embedded Connect modal. No transfer is submitted until the hosted wallet asks for explicit approval.');
       const intent = await this.client.actions.transfer({
         chainId: 1,
         to: quote.treasuryAddress,

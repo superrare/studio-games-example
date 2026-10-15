@@ -13,8 +13,8 @@ export const configurationSchema = z.object({
   apiUrl: originSchema,
   connectUrl: originSchema,
   appOrigin: originSchema,
-  display: z.literal('popup'),
-  game: z.enum(['target-rush', 'color-match']),
+  display: z.literal('embed'),
+  game: z.enum(['flappy-bird', 'platformer']),
   siblingUrl: z.string().url().refine((value) => {
     const url = new URL(value);
     return url.protocol === 'https:' && !url.username && !url.password && !url.hostname.endsWith('.invalid');
@@ -33,5 +33,7 @@ export function parseConfiguration(value: unknown, currentOrigin?: string): Conf
 }
 
 export function scoringConfiguration(game: Configuration['game']): { maxTicks: number; roundTicks: number; game: Configuration['game'] } {
-  return { maxTicks: 240, roundTicks: 200, game };
+  return game === 'flappy-bird'
+    ? { maxTicks: 1400, roundTicks: 1200, game }
+    : { maxTicks: 2600, roundTicks: 2400, game };
 }

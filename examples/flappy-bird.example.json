@@ -1,10 +1,10 @@
 {
-  "appId": "REPLACE_WITH_TARGET_RUSH_APP_UUID",
+  "appId": "REPLACE_WITH_FLAPPY_BIRD_APP_UUID",
   "groupId": "REPLACE_WITH_SHARED_CREDIT_GROUP_UUID",
   "studioUrl": "https://studio.superrare.com",
   "apiUrl": "https://api.superrare.com",
   "connectUrl": "https://connect.superrare.com",
-  "appOrigin": "https://target-rush.example.invalid",
-  "display": "popup",
-  "game": "target-rush"
+  "appOrigin": "https://flappy-bird.example.invalid",
+  "display": "embed",
+  "game": "flappy-bird"
 }

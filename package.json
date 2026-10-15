@@ -16,6 +16,7 @@
   "scripts": {
     "build": "tsx scripts/build.ts",
     "dev": "tsx scripts/dev.ts",
+    "setup:group": "tsx scripts/setup-group.ts",
     "typecheck": "tsc --noEmit",
     "test": "tsx --test tests/*.test.ts"
   },

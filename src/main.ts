@@ -22,28 +22,78 @@ async function main(): Promise<void> {
   if (!response.ok) throw new Error(`Could not load /config.json: HTTP ${response.status}`);
   const raw: unknown = await response.json();
   const configuration = parseConfiguration(raw, location.origin);
-  const name = configuration.game === 'color-match' ? 'Color Match' : 'Target Rush';
+  const name = configuration.game === 'flappy-bird' ? 'Sky Hopper' : 'Star Runner';
   document.title = `${name} · Studio credits`;
   requiredElement('h1').textContent = name;
-  requiredElement('.lede').textContent = configuration.game === 'color-match'
-    ? 'Choose the color named by the server. Correct matches score; wrong choices do not. Each ten-second round costs one Studio credit.'
-    : 'Hit as many moving targets as you can in ten seconds. Each new round costs one Studio credit.';
-  requiredElement('#configuration').textContent = `App ${configuration.appId} · shared credit group ${configuration.groupId} · ${configuration.studioUrl} · published Connect 0.9.0-beta.0 · popup`;
+  requiredElement('.lede').textContent = configuration.game === 'platformer'
+    ? 'Leap across three original platforming levels. Every run costs one Studio credit; the server verifies every move and score.'
+    : 'Guide your bird through shifting pipes. Each run costs one Studio credit; obstacles, timing and score are verified by the server.';
+  requiredElement('#configuration').textContent = `App ${configuration.appId} · shared credit group ${configuration.groupId} · ${configuration.studioUrl} · published Connect 0.9.0-beta.0 · embedded modal`;
   if (configuration.siblingUrl) {
     const sibling = requiredElement<HTMLAnchorElement>('#sibling-game');
     sibling.href = configuration.siblingUrl;
-    sibling.textContent = configuration.game === 'color-match' ? 'Play Target Rush →' : 'Play Color Match →';
+    sibling.textContent = configuration.game === 'platformer' ? 'Play Sky Hopper →' : 'Play Star Runner →';
     sibling.hidden = false;
   }
 
   let credits: Credits | undefined;
   let readAddress: () => string | undefined = () => undefined;
+  const connectModal = requiredElement<HTMLDialogElement>('#connect-modal');
+  const connectFrameRoot = requiredElement('#connect-embed');
+  const connectModalStatus = requiredElement('#connect-modal-status');
+  let connectFrame: HTMLIFrameElement | undefined;
+  const dismissConnectModal = (): void => {
+    if (connectModal.open) connectModal.close();
+    connectFrame?.remove();
+    connectFrame = undefined;
+  };
+  connectModal.addEventListener('close', () => {
+    connectFrame?.remove();
+    connectFrame = undefined;
+  });
+  requiredElement<HTMLButtonElement>('#connect-close').addEventListener('click', dismissConnectModal);
+
   const client = createSuperRareClient({
     studioUrl: configuration.studioUrl,
     apiUrl: configuration.apiUrl,
     connectUrl: configuration.connectUrl,
     sessionStorage: accountStorage(localStorage, () => readAddress()),
-    onIntentSettled: (intent) => credits?.onIntentSettled(intent),
+    embed: {
+      open(url, _target) {
+        if (connectModal.open) return null;
+        const frame = document.createElement('iframe');
+        frame.title = 'SuperRare Connect sign-in or checkout';
+        frame.allow = 'payment';
+        connectFrameRoot.replaceChildren(frame);
+        const messageSource = frame.contentWindow;
+        if (messageSource === null) {
+          frame.remove();
+          return null;
+        }
+        connectFrame = frame;
+        connectModalStatus.textContent = 'Complete the requested action in SuperRare Connect. Wallet transactions still require explicit approval.';
+        connectModal.showModal();
+        frame.src = url;
+        return {
+          messageSource,
+          get closed() { return !frame.isConnected || !connectModal.open; },
+          close() {
+            if (connectFrame === frame) dismissConnectModal();
+            else frame.remove();
+          },
+          location: { replace(nextUrl) { frame.src = nextUrl; } },
+        };
+      },
+      onUnavailable(error) {
+        const message = `Embedded Connect is unavailable (${error.code}). No popup was opened; close this window and retry in a browser that allows embedded sign-in.`;
+        connectModalStatus.textContent = message;
+        signInStatus.textContent = message;
+      },
+    },
+    onIntentSettled: (intent) => {
+      credits?.onIntentSettled(intent);
+      if (['completed', 'failed', 'cancelled'].includes(intent.status)) dismissConnectModal();
+    },
   });
   readAddress = () => client.auth.getSession()?.address;
   const game = client.games.forGame({ appId: configuration.appId, groupId: configuration.groupId });
@@ -170,10 +220,11 @@ async function main(): Promise<void> {
     if (failedVerification && client.auth.getSession()) { await verifySession(); return; }
     busy = true;
     renderAuth();
-    signInStatus.textContent = 'Opening SuperRare Connect sign-in in a popup…';
+    signInStatus.textContent = 'Opening SuperRare Connect in an embedded modal…';
     try {
       const result = await client.auth.login();
       authenticated = result.status === 'authenticated';
+      dismissConnectModal();
       failedVerification = false;
       signInStatus.textContent = authenticated ? 'Signed in. Authorize this game when ready.'
         : `Sign-in ${result.status}. No purchase or play was started.`;
