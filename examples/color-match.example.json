@@ -1,0 +1,10 @@
+{
+  "appId": "REPLACE_WITH_COLOR_MATCH_APP_UUID",
+  "groupId": "REPLACE_WITH_SHARED_CREDIT_GROUP_UUID",
+  "studioUrl": "https://studio.superrare.com",
+  "apiUrl": "https://api.superrare.com",
+  "connectUrl": "https://connect.superrare.com",
+  "appOrigin": "https://color-match.example.invalid",
+  "display": "popup",
+  "game": "color-match"
+}

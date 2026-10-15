@@ -1,0 +1,56 @@
+:root {
+  color-scheme: dark;
+  font: 16px/1.5 system-ui, sans-serif;
+  background: #101522;
+  color: #eef2ff;
+  --muted: #b4bfd5;
+  --line: #34405a;
+  --mint: #82e8c1;
+}
+[hidden] { display: none !important; }
+* { box-sizing: border-box; }
+body { margin: 0; padding: 32px 18px; }
+main { max-width: 980px; margin: 0 auto; }
+h1 { margin: 0; font-size: clamp(2.4rem, 7vw, 4.4rem); line-height: 1; letter-spacing: -.05em; }
+h2 { margin: 0 0 12px; font-size: 1.2rem; }
+button { min-height: 44px; padding: 10px 15px; border: 1px solid transparent; border-radius: 9px; color: #101522; background: var(--mint); font: inherit; font-weight: 700; cursor: pointer; touch-action: manipulation; }
+button.secondary { color: #eef2ff; background: transparent; border-color: #64728e; }
+button:disabled { opacity: .48; cursor: not-allowed; }
+button:focus-visible, summary:focus-visible, #target:focus-visible { outline: 3px solid #ffe08b; outline-offset: 3px; }
+.eyebrow { margin: 0 0 10px; color: var(--mint); font-size: .75rem; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
+.lede { max-width: 650px; margin: 14px 0 28px; color: var(--muted); }
+.layout { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(275px, 1fr); gap: 20px; align-items: start; }
+.card { padding: 20px; border: 1px solid var(--line); border-radius: 17px; background: #192136; }
+.arena { position: relative; height: 330px; overflow: hidden; border: 1px solid #405577; border-radius: 13px; background: radial-gradient(circle at center, #253957, #101929); }
+.arena-message { position: absolute; inset: 0; display: grid; place-items: center; padding: 22px; color: var(--muted); text-align: center; pointer-events: none; }
+#target { position: absolute; width: 58px; height: 58px; border: 7px solid #ffadc0; border-radius: 50%; background: #ff6b82; box-shadow: 0 0 0 5px #ff6b822b; }
+#target::after { display: block; width: 14px; height: 14px; margin: auto; border-radius: 50%; background: white; content: ''; }
+.game-actions, .credit-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+#round-status, #connection-status, #purchase-status { min-height: 1.5em; color: var(--muted); }
+.connection { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line); }
+.connection p { color: var(--muted); }
+#connect-status { min-height: 1.5em; }
+.fine-print, .developer { color: var(--muted); font-size: .84rem; }
+.developer { margin-top: 22px; }
+.developer summary { width: fit-content; cursor: pointer; }
+.high-scores { margin-top: 22px; }
+.high-scores-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+.high-scores-header h2 { margin: 0; }
+.high-scores table { width: 100%; border-collapse: collapse; margin-top: 16px; font-variant-numeric: tabular-nums; }
+.high-scores th, .high-scores td { padding: 12px 8px; border-bottom: 1px solid var(--line); text-align: left; }
+.high-scores th { color: var(--muted); font-size: .84rem; font-weight: 600; }
+.high-scores th:last-child, .high-scores td:last-child { text-align: right; }
+.high-scores td:nth-child(2) { overflow-wrap: anywhere; }
+.payment-notice { padding: 16px; border: 1px solid #b9a667; border-radius: 12px; color: #ffe6a1; background: #29251d; }
+nav { margin: 0 0 20px; }
+a { color: var(--mint); }
+.technical-details { white-space: pre-line; overflow-wrap: anywhere; }
+.color-panel { height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 20px; padding: 20px; }
+.color-prompt { margin: 0; font-size: 1.8rem; font-weight: 800; text-align: center; }
+.color-choices { display: grid; width: 100%; max-width: 360px; grid-template-columns: 1fr 1fr; gap: 12px; }
+.color-choice { min-height: 64px; text-transform: capitalize; border: 2px solid #ffffff80; color: #fff; }
+.color-red { background: #b7203a; }
+.color-blue { background: #205bc0; }
+.color-green { background: #137140; }
+.color-gold { background: #efd05d; color: #24200c; }
+@media (max-width: 720px) { body { padding: 22px 14px; } .layout { grid-template-columns: 1fr; } .arena { height: 280px; } }

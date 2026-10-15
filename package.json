@@ -1,0 +1,28 @@
+{
+  "name": "@superrare/studio-games-example",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Two server-verified Studio games sharing paid credits through SuperRare Connect",
+  "license": "MIT",
+  "type": "module",
+  "repository": { "type": "git", "url": "https://github.com/superrare/studio-games-example.git" },
+  "packageManager": "pnpm@10.11.0",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "build": "tsx scripts/build.ts",
+    "dev": "tsx scripts/dev.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test tests/*.test.ts"
+  },
+  "dependencies": {
+    "@rareprotocol/connect": "0.8.0",
+    "zod": "4.3.6"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.21",
+    "esbuild": "^0.25.5",
+    "fflate": "^0.8.2",
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3"
+  }
+}
