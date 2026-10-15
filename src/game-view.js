@@ -25,6 +25,9 @@ export class GameView {
     this.variant = variant;
     this.onInput = onInput;
     this.view = null;
+    this.previousView = null;
+    this.snapshotAt = performance.now();
+    this.snapshotInterval = 50;
     this.disposed = false;
     this.active = false;
     this.held = new Map();
@@ -183,28 +186,45 @@ export class GameView {
 
   render(view) {
     if (this.disposed) return;
+    if (this.view !== view) {
+      const now = performance.now();
+      const previous = this.view;
+      if (this.variant === 'flappy-bird' && previous?.started && view.started
+        && !previous.gameOver && !view.gameOver && previous.tick < view.tick) {
+        this.previousView = previous;
+        this.snapshotInterval = Math.max(16, Math.min(100, now - this.snapshotAt));
+      } else {
+        this.previousView = null;
+      }
+      this.snapshotAt = now;
+      this.view = view;
+    }
     const active = view.started && !view.gameOver;
     if (!active) {
       this.active = false;
       this.release();
     }
-    this.view = view;
     this.active = active;
     for (const button of this.buttons) button.disabled = !active;
     const level = this.variant === 'platformer' ? ` Level ${view.platform.level + 1}/3.` : '';
     const status = `${view.outcome}.${level} Score ${view.score}.`;
     if (this.readout.textContent !== status) this.readout.textContent = status;
-    this.draw(performance.now());
   }
 
   reset() {
     if (this.disposed) return;
     this.release();
     this.view = null;
+    this.previousView = null;
+    this.snapshotAt = performance.now();
     this.active = false;
     for (const button of this.buttons) button.disabled = true;
     this.readout.textContent = 'Ready. Start a paid play using the Play button. Preview only; no run has started.';
     this.draw(performance.now());
+  }
+  interpolationAmount(time) {
+    if (this.reducedMotion || !this.previousView || this.variant !== 'flappy-bird') return 1;
+    return Math.max(0, Math.min(1, (time - this.snapshotAt) / this.snapshotInterval));
   }
 
   dispose() {
@@ -279,16 +299,29 @@ export class GameView {
     this.hills(ctx, '#acd4ab', 337, time / 18, 0.1);
     this.hills(ctx, '#7db9a5', 377, time / 18, 0.2);
     const state = this.view?.flappy;
+    const previous = this.previousView?.flappy;
+    const alpha = this.interpolationAmount(time);
     const pipes = state?.pipes ?? [{ id: 0, x: 485, gapY: 155 }, { id: 1, x: 745, gapY: 122 }];
     for (const pipe of pipes) {
-      this.pipe(ctx, pipe.x, 0, pipe.gapY, true);
-      this.pipe(ctx, pipe.x, pipe.gapY + 156, HEIGHT - pipe.gapY - 156, false);
+      let x = pipe.x;
+      if (previous) {
+        for (const oldPipe of previous.pipes) {
+          if (oldPipe.id === pipe.id) {
+            x = oldPipe.x + (pipe.x - oldPipe.x) * alpha;
+            break;
+          }
+        }
+      }
+      this.pipe(ctx, x, 0, pipe.gapY, true);
+      this.pipe(ctx, x, pipe.gapY + 156, HEIGHT - pipe.gapY - 156, false);
     }
     const idle = !this.view?.started;
-    const y = idle ? 206 + Math.sin(time / 360) * 6 : state.y;
+    const y = idle ? 206 + Math.sin(time / 360) * 6
+      : previous ? previous.y + (state.y - previous.y) * alpha : state.y;
+    const vy = previous ? previous.vy + (state.vy - previous.vy) * alpha : state?.vy ?? 0;
     ctx.save();
     ctx.translate(172, y + 12);
-    ctx.rotate(idle ? -0.08 : Math.max(-0.35, Math.min(0.8, state.vy / 18)));
+    ctx.rotate(idle ? -0.08 : Math.max(-0.35, Math.min(0.8, vy / 18)));
     // Original little sky courier: teal wings, golden body, and a tiny coral scarf.
     ctx.fillStyle = '#213f4a';
     ctx.fillRect(-13, -10, 25, 21);

@@ -59,8 +59,8 @@ Read [server verification and abuse limits](docs/server-verification.md) before 
 
 Both apps are deployed at their permanent HTTPS origins and registered in one shared mainnet credit group:
 
-- **Sky Hopper:** app `f89bd492-1479-46ff-b455-1ec479e45684` · [tu9zzywe.srstudio.dev](https://tu9zzywe.srstudio.dev) · current deployment `f2698cec-1ac6-421a-98d3-484c968a9962` · event `146272af-4938-4ef7-8ddf-77ec6badbbdd`.
-- **Star Runner:** app `7d0a34a0-ca86-413a-871c-7b731adf4511` · [q77e66pg.srstudio.dev](https://q77e66pg.srstudio.dev) · current deployment `ea39fb1d-adfe-4e9a-8db3-6729a43ad9cf` · event `7d6d0f8d-98db-46ec-aae9-1140e2392ba9`.
+- **Sky Hopper:** app `f89bd492-1479-46ff-b455-1ec479e45684` · [tu9zzywe.srstudio.dev](https://tu9zzywe.srstudio.dev) · current deployment `3e8208b7-4b84-4135-9ff2-7d860f54c3d2` · event `c829da99-4c3b-4306-9a71-654e775af781`.
+- **Star Runner:** app `7d0a34a0-ca86-413a-871c-7b731adf4511` · [q77e66pg.srstudio.dev](https://q77e66pg.srstudio.dev) · current deployment `e0aaca35-8406-4626-92dd-52402f6d461c` · event `bd9e8d8c-27e4-47a4-8a3d-45a47bab0c93`.
 
 Group `8020b761-b30e-41a5-9f14-8c82728cfdb2` is configured for canonical Ethereum USDC at **$0.10 / 10 credits**, with each app costing **1 credit per play**. Both authenticated server-scoring events are active with a 20-attempt per-identity limit. Sign-in and hosted wallet checkout open in embedded Connect modals. The group and event setup is live-capable, but no wallet purchase or paid gameplay was exercised. Buying credits transfers real USDC to the configured treasury; don't purchase merely to inspect the games. Local app configs are ignored and contain the shared group binding.
 

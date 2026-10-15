@@ -48,6 +48,8 @@ The packaged root `server-verifier.js` exports a default object with `fetch(Requ
 
 The public view and coordinator snapshot schemas intentionally reject a private state containing `rngState` or `lastInputTick`. Do not replace the projection with the internal state or reintroduce client-side replay as score authority. Malformed envelopes/state return HTTP 400; other paths/methods return 404. An illegal game action does not award points; it can still consume the coordinator's input slot/tick.
 
+The Flappy client may interpolate bird and pipe positions between public server snapshots for smoother display. This is presentation-only: the current verifier snapshot remains authoritative for controls, score, collision and result; never serialize an interpolated frame as run state or submit it to the server.
+
 ## Local acceptance
 
 Run from the repository root:
