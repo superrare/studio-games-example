@@ -11,14 +11,14 @@ Each game has its own Studio app ID, HTTPS origin, immutable deployment, verifie
 
 ## Start here
 
-Follow the [organizer runbook](docs/organizer-runbook.md) for the complete two-game deployment, recovery and acceptance workflow. It includes the current CLI installation reality, bootstrap app allocation, exact origin registration, verifier/event publication and the optional, separately approved real-mainnet wallet check.
+Follow the [organizer runbook](docs/organizer-runbook.md) for the complete two-game deployment, recovery and acceptance workflow. It pins the published rare-profile CLI, explains the deployment-bound scoring registration performed by `app update`, and covers app identity, exact-origin registration, recovery and the optional, separately approved real-mainnet wallet check.
 
 For game implementation and prize integrity, read the [server-verification guide](docs/server-verification.md): the real Worker contract, copy-paste local and bundled-verifier checks, game-specific anti-cheat design, known bot weaknesses, and the manual result-review/payout checklist. Server-verified scores are not proof of human play or automatic prize eligibility.
 
 ### Requirements
 
 - Node.js **22 or newer**, Git, and pnpm **10.11.0** (the repository's declared package manager).
-- A Studio creator account and the feature-enabled `rare-profile` CLI for deployment. The runbook pins the merged source commit while the required beta is not yet published to npm.
+- A Studio creator account and `@rareprotocol/rare-profile@0.1.0-beta.4` for deployment.
 - For an explicitly approved paid check only: a wallet with Ethereum USDC and sufficient Ethereum gas, and a treasury the organizer controls.
 
 ```sh
@@ -29,7 +29,13 @@ corepack prepare pnpm@10.11.0 --activate
 pnpm install
 ```
 
-The dependency is a published npm release; no Connect SDK checkout, branch build, private registry or Privy application secret is needed.
+```sh
+npm install --global @rareprotocol/rare-profile@0.1.0-beta.4
+rare-profile --version
+rare-profile login
+```
+
+The browser dependency and deployment CLI are published npm packages; no Connect SDK checkout, rare-profile source build, private registry or Privy application secret is needed.
 
 ### Configure and build
 
@@ -45,7 +51,7 @@ A per-game public configuration has this shape:
   "apiUrl": "https://api.superrare.com",
   "connectUrl": "https://connect.superrare.com",
   "appOrigin": "https://<this-games-exact-hostname>",
-  "display": "popup",
+  "display": "embed",
   "game": "target-rush"
 }
 ```
@@ -67,7 +73,7 @@ server-verifier.js
 scoring-config.json
 ```
 
-Keep the game client, verifier and scoring configuration together. The build selects the game variant and emits its matching scoring config (`maxTicks: 240`, `roundTicks: 200`). Uploading the ZIP does **not** itself create a scoring event. Studio provisions the root verifier privately rather than serving it as a public static asset.
+Keep the game client, verifier and scoring configuration together. The build selects the game variant and emits its matching scoring config (`maxTicks: 240`, `roundTicks: 200`). A raw ZIP upload alone does not create a scoring event; rare-profile beta.4's `app update` registers the verifier and event after the deployment. Studio provisions the root verifier privately rather than serving it as a public static asset.
 
 ### Local development and checks
 
@@ -82,30 +88,35 @@ Local HTTP is for development, not paid-flow acceptance: Studio registers exact 
 
 ## Integration boundaries
 
-- Published Connect 0.9.0-beta.0 supplies popup authentication, scoped group credits, payment intents, explicit paid-start consent/recovery, server-run start and authoritative scoring reads. Sign-in uses `auth.login()`; `game.connect()` then authorizes through the Studio API without opening another hosted flow. The SDK supports opt-in embedding, but these examples deliberately keep popup authentication.
-- The example calls the SDK's `getActiveScoringEvent()` and `getServerLeaderboard()` on the deployed game's own origin. Its server-run client uses that origin too, so WebSocket tickets are used on the correct host. Credit operations use canonical Studio. No copied scoring HTTP client or SDK checkout is required.
+- Published Connect 0.9.0-beta.0 supplies embedded sign-in and checkout, scoped group credits, payment intents, explicit paid-start consent/recovery, server-run start and authoritative scoring reads. The Connect transport uses a merchant-owned modal iframe; `auth.login()` opens it from the sign-in action, while `game.connect()` remains an API-only authorization exchange. No login or authorization step buys credits or starts a paid play.
+- The example calls the SDK's `getActiveScoringEvent()` and `getServerLeaderboard()` on the deployed game's own origin. Its server-run client uses that origin too, so WebSocket tickets are used on the correct host. Credit operations use canonical Studio. No copied scoring HTTP client or separate checkout implementation is required.
 - Saved purchase, consent, paid-start, server-run and completion records are recovery evidence, not permission to initiate another payment or charge. Preserve original keys after uncertain outcomes and keep records scoped to wallet, group, app and origin.
 - Unreadable purchase recovery records block replacement purchases instead of treating the old payment as absent. Memory-only consent blocks paid start until durable recovery is restored. JavaScript/CSS asset names are content-hashed for Studio's immutable asset cache.
 - A fresh account starts with zero purchased credits. No seeded credits, automatic grants, free paid-start fallback or automated prize payouts are included.
 
 ## Publishing and contest operations
 
-Update the **same apps** after bootstrap rather than allocating replacement identities. Every scoring deployment needs its root verifier, matching verifier version and an event pinned to that deployment. Group membership survives an update; scoring readiness does not automatically migrate. See the [runbook's publishing and update steps](docs/organizer-runbook.md#6-publish-a-verifier-version-and-scoring-event).
+Update the **same apps** after bootstrap rather than allocating replacement identities. Each game ZIP includes the matching root verifier and scoring config. With rare-profile beta.4, `app update --max-attempts <n>` registers the new deployment's verifier and scoring event; credit-group membership remains tied to the app. See the [runbook's publishing and update steps](docs/organizer-runbook.md#6-register-scoring-for-each-published-deployment).
 
 The public top score spans completed events/builds for an app. It is not an event standings table, weekly winner list, combined-game ranking or prize calculator. Organizers must establish contest windows, eligibility, tie-breaking, result review, prize funding and fulfillment separately.
 
-## Live integration check — 2026-10-15
+## Live integration check — 2026-10-16
 
-- [Target Rush](https://y4prnpya.srstudio.dev)
-- [Color Match](https://q3s9bpab.srstudio.dev)
+- [Target Rush](https://y4prnpya.srstudio.dev) — app `25627f68-6ef5-47e3-826d-6632bc6a1f50`
+- [Color Match](https://q3s9bpab.srstudio.dev) — app `83868300-84d5-419b-acac-f432cc49d1e9`
 
-These are mainnet integration-test deployments, not free-play demos. Both use one enabled credit group at **0.01 USDC / 10 credits**, **1 credit / round**, and have separate deployment-pinned verifiers and authenticated scoring events. Do not send money merely to inspect the example.
+These are mainnet integration-test apps, not free-play demos. Both are deployment version `7`, published with `@rareprotocol/rare-profile@0.1.0-beta.4`, and use the shared group at **0.01 USDC / 10 credits**, **1 credit / round**. The game-owned Connect modal embeds hosted login and checkout. Do not send money merely to inspect them; creator publishing did not transfer money or start paid play.
 
-The source now uses the published Connect beta. These URLs still represent the original 0.8.0 deployments until the organizer rebuilds, redeploys and republishes their deployment-pinned verifier/events using the runbook; changing the dependency does not update live games automatically.
+| Game | Deployment | Verifier version | Active scoring event |
+| --- | --- | --- | --- |
+| Target Rush | `304e95d3-e2aa-47cb-9bda-1d7dfa95b074` | `4d3fb3b0-dbfe-48f7-9ed6-a3a932dd0f8f` | `c649fee9-e457-4aeb-9a5b-14dbc478df71` |
+| Color Match | `b0fa7102-8707-4410-86c5-35053306f0f0` | `6099783b-7558-4b3e-ba35-9865371ae72b` | `e43c8e57-deb1-483d-9c71-391a25bca963` |
 
-Original 0.8.0 deployment check: both artifact builds, typecheck, 13 focused regressions, both packaged verifier rounds (including rejection of a wrong color), production verifier conformance/event publication, live active-event and empty server-leaderboard reads, desktop/mobile signed-out rendering, hosted Connect sign-in surfaces with the correct initiating origin, and cancellation without payment or paid-start requests.
+Both deployed `/config.json` files report `display: "embed"` and both public active-event endpoints returned the event IDs above. The hosted sign-in page rendered inside the modal in each game. Close and Escape removed the iframe; reopening created a fresh login intent. The mobile modal fit a 390×844 viewport without horizontal overflow. No sign-in was completed, wallet action/payment or paid play was performed.
 
-Not yet exercised: completed player authentication, a real USDC transfer/claim, paid rounds, and the purchased-balance transition across both games. Those require the payer's explicit wallet approval; creator deployment credentials are not a substitute. Follow the runbook's separately approved mainnet acceptance checklist before treating this as payment/gameplay acceptance.
+`pnpm typecheck` and all 12 repository tests passed. Both game ZIPs were rebuilt and published as version 7 after the modal lifecycle and mobile sizing fixes. Browser JavaScript console errors were absent; canceled iframe navigations reported expected `ERR_ABORTED` request records.
+
+Not yet exercised: completed player authentication, the embedded-storage-unavailable response, a real USDC transfer/claim, paid rounds, and the purchased-balance transition across both games. Follow the runbook's separately approved mainnet acceptance checklist before treating this as payment/gameplay acceptance.
 
 ## License
 

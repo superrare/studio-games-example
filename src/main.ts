@@ -1,4 +1,4 @@
-import { createSuperRareClient } from '@rareprotocol/connect';
+import { ConnectEmbedUnavailableError, createSuperRareClient } from '@rareprotocol/connect';
 import { accountStorage } from './account-storage.js';
 import { parseConfiguration } from './config.js';
 import { Credits } from './credits.js';
@@ -16,6 +16,9 @@ const signOutButton = requiredElement<HTMLButtonElement>('#sign-out');
 const authorizeButton = requiredElement<HTMLButtonElement>('#connect');
 const signInStatus = requiredElement('#connect-status');
 const authorizationStatus = requiredElement('#connection-status');
+const connectDialog = requiredElement<HTMLDialogElement>('#connect-modal');
+const connectFrameHost = requiredElement('#connect-embed');
+const closeConnectButton = requiredElement<HTMLButtonElement>('#close-connect');
 
 async function main(): Promise<void> {
   const response = await fetch('/config.json', { cache: 'no-store' });
@@ -28,7 +31,7 @@ async function main(): Promise<void> {
   requiredElement('.lede').textContent = configuration.game === 'color-match'
     ? 'Choose the color named by the server. Correct matches score; wrong choices do not. Each ten-second round costs one Studio credit.'
     : 'Hit as many moving targets as you can in ten seconds. Each new round costs one Studio credit.';
-  requiredElement('#configuration').textContent = `App ${configuration.appId} · shared credit group ${configuration.groupId} · ${configuration.studioUrl} · published Connect 0.9.0-beta.0 · popup`;
+  requiredElement('#configuration').textContent = `App ${configuration.appId} · shared credit group ${configuration.groupId} · ${configuration.studioUrl} · published Connect 0.9.0-beta.0 · embedded`;
   if (configuration.siblingUrl) {
     const sibling = requiredElement<HTMLAnchorElement>('#sibling-game');
     sibling.href = configuration.siblingUrl;
@@ -38,10 +41,48 @@ async function main(): Promise<void> {
 
   let credits: Credits | undefined;
   let readAddress: () => string | undefined = () => undefined;
+  function dismissConnect(frame: Element | null = connectFrameHost.firstElementChild): void {
+    if (frame === null || frame.parentElement !== connectFrameHost) return;
+    frame.remove();
+    if (connectDialog.open) connectDialog.close();
+  }
   const client = createSuperRareClient({
     studioUrl: configuration.studioUrl,
     apiUrl: configuration.apiUrl,
     connectUrl: configuration.connectUrl,
+    embed: {
+      open() {
+        if (connectDialog.open) return null;
+        requiredElement('#connect-modal-status').textContent = '';
+        const frame = document.createElement('iframe');
+        frame.title = 'SuperRare Connect';
+        frame.allow = 'payment';
+        connectFrameHost.replaceChildren(frame);
+        try {
+          connectDialog.showModal();
+        } catch {
+          frame.remove();
+          return null;
+        }
+        const messageSource = frame.contentWindow;
+        if (messageSource === null) {
+          frame.remove();
+          connectDialog.close();
+          return null;
+        }
+        return {
+          messageSource,
+          get closed() { return !frame.isConnected; },
+          close() { dismissConnect(frame); },
+          location: { replace(nextUrl: string) { frame.src = nextUrl; } },
+        };
+      },
+      onUnavailable: (error) => {
+        const message = `Embedded Connect is unavailable (${error.code}). This browser must permit embedded storage. Close this window to return; saved purchase and play recovery records are preserved. No popup was opened.`;
+        requiredElement('#connect-modal-status').textContent = message;
+        signInStatus.textContent = message;
+      },
+    },
     sessionStorage: accountStorage(localStorage, () => readAddress()),
     onIntentSettled: (intent) => credits?.onIntentSettled(intent),
   });
@@ -170,17 +211,26 @@ async function main(): Promise<void> {
     if (failedVerification && client.auth.getSession()) { await verifySession(); return; }
     busy = true;
     renderAuth();
-    signInStatus.textContent = 'Opening SuperRare Connect sign-in in a popup…';
+    let loginFrame: Element | null = null;
+    signInStatus.textContent = 'Opening embedded SuperRare Connect sign-in…';
     try {
-      const result = await client.auth.login();
+      const login = client.auth.login();
+      loginFrame = connectFrameHost.firstElementChild;
+      const result = await login;
       authenticated = result.status === 'authenticated';
       failedVerification = false;
       signInStatus.textContent = authenticated ? 'Signed in. Authorize this game when ready.'
         : `Sign-in ${result.status}. No purchase or play was started.`;
       await refreshPanels();
     } catch (error) {
-      signInStatus.textContent = `Sign-in failed (${describeSdkFailure(error)}). Retry when ready; recovery records are preserved.`;
-    } finally { busy = false; renderAuth(); }
+      signInStatus.textContent = error instanceof ConnectEmbedUnavailableError
+        ? 'Embedded sign-in is unavailable. Use a browser that permits embedded storage; no popup, purchase or play was started.'
+        : `Sign-in failed (${describeSdkFailure(error)}). Retry when ready; recovery records are preserved.`;
+    } finally {
+      dismissConnect(loginFrame);
+      busy = false;
+      renderAuth();
+    }
   });
   authorizeButton.addEventListener('click', async () => {
     if (busy || !authenticated) return;
@@ -204,6 +254,12 @@ async function main(): Promise<void> {
     try { await client.auth.logout(); }
     catch (error) { signInStatus.textContent = `Sign-out failed (${describeSdkFailure(error)}). Saved records remain intact.`; }
     finally { busy = false; renderAuth(); }
+  });
+  closeConnectButton.addEventListener('click', () => dismissConnect());
+  connectDialog.addEventListener('close', () => connectFrameHost.replaceChildren());
+  connectDialog.addEventListener('cancel', (event) => {
+    event.preventDefault();
+    dismissConnect();
   });
   window.addEventListener('storage', () => { void verifySession(); });
   window.addEventListener('pagehide', () => {

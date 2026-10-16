@@ -6,7 +6,7 @@ import { Credits } from '../src/credits.js';
 
 const appId = '11111111-1111-4111-8111-111111111111';
 const groupId = '22222222-2222-4222-8222-222222222222';
-const valid = { appId, groupId, studioUrl: 'https://studio.superrare.com', apiUrl: 'https://api.superrare.com', connectUrl: 'https://connect.superrare.com', appOrigin: 'https://game.example.com', display: 'popup', game: 'target-rush' };
+const valid = { appId, groupId, studioUrl: 'https://studio.superrare.com', apiUrl: 'https://api.superrare.com', connectUrl: 'https://connect.superrare.com', appOrigin: 'https://game.example.com', display: 'embed', game: 'target-rush' };
 
 test('SDK session restoration is global but game auth and pending consent isolate canonical wallets', () => {
   const values = new Map<string, string>();
@@ -32,11 +32,11 @@ test('SDK session restoration is global but game auth and pending consent isolat
   assert.equal(storage.getItem('superrare.connect.game-authorization:scope'), 'wallet B auth');
 });
 
-test('configuration rejects placeholders, seeded query overrides, embed, origins and secrets', () => {
+test('configuration requires embedded Connect and rejects insecure origins and secrets', () => {
   assert.deepEqual(parseConfiguration(valid, valid.appOrigin), valid);
   assert.throws(() => parseConfiguration({ ...valid, appId: 'REPLACE_WITH_UUID' }));
   assert.throws(() => parseConfiguration({ ...valid, appOrigin: 'https://game.example.invalid' }));
-  assert.throws(() => parseConfiguration({ ...valid, display: 'embed' }));
+  assert.throws(() => parseConfiguration({ ...valid, display: 'popup' }));
   assert.throws(() => parseConfiguration({ ...valid, apiUrl: 'http://api.superrare.com' }));
   assert.throws(() => parseConfiguration({ ...valid, appSecret: 'must-not-be-public' }));
   assert.throws(() => parseConfiguration(valid, 'https://unapproved.example.com'));

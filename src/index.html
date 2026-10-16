@@ -29,6 +29,14 @@
           <p class="fine-print">Authentication, game authorization, payment confirmation, and Play are separate approvals. Reloading or visiting the other game never starts a purchase or paid play. Purchases need hosted wallet approval.</p>
         </aside>
       </section>
+      <dialog id="connect-modal" aria-labelledby="connect-modal-title">
+        <div class="connect-modal-header">
+          <h2 id="connect-modal-title">SuperRare Connect</h2>
+          <button id="close-connect" class="secondary" type="button">Close</button>
+        </div>
+        <p id="connect-modal-status" class="fine-print" role="status" aria-live="polite"></p>
+        <div id="connect-embed"></div>
+      </dialog>
       <details class="developer"><summary>Integration details</summary><p id="configuration"></p><p>The ZIP includes a server-verifier.js worker. Studio’s Workers for Platforms runtime validates ordered inputs, advances server-owned time, and records the verifier’s final score. The browser never submits a claimed score.</p></details>
       <section class="card high-scores" aria-labelledby="high-scores-title">
         <div class="high-scores-header">
