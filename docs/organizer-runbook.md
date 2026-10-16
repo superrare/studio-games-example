@@ -25,7 +25,7 @@ An app can belong to multiple groups. This example explicitly selects one group;
 
 ## 2. Install the tools that actually contain the feature
 
-Use Node.js **22+** and pnpm **10.11.0** for this example. The CLI declares Node 20+, but using Node 22+ satisfies both projects. You also need Git and a ZIP utility for the small bootstrap below.
+Use Node.js **22+** and pnpm **10.11.0** for this example. The rare-profile CLI supports Node 20+; Git is also required.
 
 ```sh
 corepack enable
@@ -37,23 +37,17 @@ pnpm install
 
 The repository pins the published **`@rareprotocol/connect@0.9.0-beta.0`** npm prerelease and its lockfile, not an unpublished SDK checkout. The SDK supplies popup sign-in, group credits, explicit consent/recovery, server-run start and public authoritative scoring reads. These examples call `getActiveScoringEvent()` and `getServerLeaderboard()` through a client pointed at the deployed game's own origin; community leaderboards are not a substitute for server results. Sign in with `auth.login()` before the API-only `game.connect()` authorization step. Native embedding is available in this beta but is deliberately not enabled in these popup examples.
 
-### Current rare-profile release reality
+### Install rare-profile CLI beta.4
 
-The feature-enabled CLI reports **`0.1.0-beta.4`**. At the 2026-10-15 release check, npm `latest` and `beta` still pointed to beta.3. Do not assume `npm install -g @rareprotocol/rare-profile` supplies group commands. Until npm publishes the merged feature release, install from the public merged commit **`4a9edb3deb63b0941e34748561d39245ac41a74a`**:
+`@rareprotocol/rare-profile@0.1.0-beta.4` is published on npm with the deployment-bound scoring workflow. Install the pinned version; do not clone/build the CLI repository:
 
 ```sh
-git clone https://github.com/superrare/rare-profile.git /tmp/rare-profile-game-setup
-git -C /tmp/rare-profile-game-setup checkout --detach 4a9edb3deb63b0941e34748561d39245ac41a74a
-pnpm --dir /tmp/rare-profile-game-setup install --frozen-lockfile
-pnpm --dir /tmp/rare-profile-game-setup build
-(cd /tmp/rare-profile-game-setup && npm pack)
-npm install --global /tmp/rare-profile-game-setup/rareprotocol-rare-profile-0.1.0-beta.4.tgz
+npm install --global @rareprotocol/rare-profile@0.1.0-beta.4
 rare-profile --version
-rare-profile --help
-rare-profile credit-group --help
+rare-profile whoami
 ```
 
-Use an unused checkout directory if that path already exists. The source build is the installation workaround, not a requirement for a private package registry. `app deploy --help` is not reliable subcommand help in this CLI: it can run validation and report missing deployment flags. Use the exact commands below.
+The release supports `app scoring` recovery and automatically registers the current deployment's verifier and scoring event during game `app update`. Keep the creator PAT private; the CLI exchanges it for a scoped session and does not print or pass the credential through command arguments.
 
 ### Authenticate and choose the existing storefront
 
@@ -63,7 +57,7 @@ rare-profile whoami
 rare-profile store list --json
 ```
 
-Approve the CLI in your browser as the intended creator. New default CLI tokens include **`apps`**, `analytics` and `domains`; `apps` permits deployment, group management and creator scoring management. Money-moving scopes are not part of this approval. New-token settings currently expose those default scopes only. `whoami` uses `profile` scope and `store list` uses `storefronts` scope, so either inspection can fail with a new default token even when deployment is authorized. Confirm your creator identity and select your own storefront on the Studio website instead. Do not assume logging in again adds legacy scopes or use another creator's identity to work around a permission error.
+The default CLI token includes `apps`, `products`, `profile` and `storefronts` scopes, which cover app deployment/scoring, current-deployment lookup, identity checks and storefront listing. It excludes wallet and payment scopes. Confirm `whoami` identifies the app creator; that creator must own both apps. If an old/custom token returns a scope error, inspect its granted scopes in Studio rather than copying or printing credentials.
 
 If you need the storefront UUID and it is not visible in Studio's UI, the following exact read-only request uses your normal creator browser session, not an extra CLI scope. Run it only in the developer console on the signed-in `https://studio.superrare.com` page and record your own storefront's returned ID:
 
@@ -192,11 +186,13 @@ Use `game: "color-match"`, the Color Match app ID and its exact origin in the se
 pnpm build -- --config ./target-rush.config.json --output ./dist/target-rush.zip
 pnpm build -- --config ./color-match.config.json --output ./dist/color-match.zip
 
-rare-profile app update <target-app-id> --zip ./dist/target-rush.zip --json
-rare-profile app update <color-app-id> --zip ./dist/color-match.zip --json
+rare-profile app update <target-app-id> \
+  --zip ./dist/target-rush.zip --max-attempts 20 --json
+rare-profile app update <color-app-id> \
+  --zip ./dist/color-match.zip --max-attempts 20 --json
 ```
 
-If intentionally replacing an existing local output ZIP, add `--force` to the build command. Do not run `app deploy` again: that would allocate another app identity/origin rather than update the registrations you just created. The update response returns `product_id`, `version` and `app_url`; it does **not** return the immutable deployment UUID.
+Each command uploads the game ZIP, resolves the app's new current deployment, registers the bundled verifier/config, creates an authenticated scoring event (20 attempts per scoring identity), and verifies that event is active. The JSON `scoring` result reports the deployment, verifier version and event IDs. No wallet action or credit purchase is initiated.
 
 Each ZIP must have root `index.html`, `config.json`, `assets/`, `server-verifier.js` and `scoring-config.json`. The build emits the selected game variant's matching config with default `maxTicks: 240` and `roundTicks: 200`. The server owns ticks; client animation or local clock is not official time. Keep client/verifier/config versions matched. Studio removes `server-verifier.js` from public static assets and provisions it privately. A missing public verifier URL is not evidence that the module failed to publish.
 
@@ -211,187 +207,46 @@ pnpm test
 
 A local HTTP development server is not the registered HTTPS app and is not paid-flow acceptance. Do not relax origin checks, simulate credit balances or call a local preview score official. Building and deploying are creator operations; none of these commands authorizes a real wallet transfer.
 
-## 6. Publish a verifier version and scoring event
+## 6. Register scoring for each published deployment
 
-A ZIP upload and credit registration are not enough for server-scored play. Every current deployment needs a verifier version and an event **for that deployment**. `scoring-config.json` is an artifact for the organizer to publish, not an automatic event-creation trigger.
-
-Implementers: use the [verifier contract and local exercises](server-verification.md#3-implement-the-verifier-contract-correctly) before publishing, and review the [adversarial acceptance matrix](server-verification.md#6-adversarial-acceptance-matrix) before admitting prize entries.
-
-### Dashboard path for the unpaid integration smoke
-
-1. Sign in at `https://studio.superrare.com` as the **app creator**. Open `/dashboard/apps/<app-id>` and its **Deployments** tab.
-2. Confirm the current deployment reports a custom verifier. Paste the complete matching `scoring-config.json` from that game's ZIP into **Verifier configuration (JSON)**, including its game variant field. Do not paste Target Rush's config for Color Match.
-3. Set **Attempts per player** deliberately (for example `20` for an integration smoke), then choose **Enable server scoring**.
-4. The dashboard sends the current active deployment ID and config to the versions endpoint, then creates an event with `authPolicy: "authenticated"`. This accepts verified wallets as well as Studio profiles; it is not a Studio-account-only policy. It does not spend a credit or approve a wallet transaction.
-5. Repeat for the second app. Confirm each deployed origin's active-event endpoint below returns its own event ID.
-
-The dashboard's convenience control currently creates an event **without explicit start/end bounds** and returns early if an event is already active. Changing its text fields and clicking again is not an event-update mechanism. Use the creator HTTP endpoints for a deliberately bounded contest; do not describe the smoke event as a weekly contest.
-
-### Exact creator HTTP authentication
-
-Scoring management requires the **app creator's Studio session JWT**, either a normal same-origin Studio login cookie or `Authorization: Bearer <sessionToken>` obtained by exchanging the CLI PAT. A player `ConnectSession`, a scoped `GameAuthorization`, a `PlaySession`, and the raw `slk_...` CLI PAT are **not** creator scoring Bearer tokens. The backend checks creator ownership and the CLI **`apps`** scope (`manage-game-leaderboards`). Group ownership alone does not let a different creator manage an app's scoring.
-
-This read-only command uses the local CLI credential without printing it or putting it in command arguments. It exchanges `POST /auth/cli/exchange` with `{ "token": localPAT }`, checks the returned scope, then calls the authenticated scoring-version/event APIs. Set `APP_ID` to one of your actual app IDs first:
+The example ZIPs include the root verifier and matching `scoring-config.json`. With `@rareprotocol/rare-profile@0.1.0-beta.4`, updating a game also registers scoring for that exact new deployment:
 
 ```sh
-export APP_ID='<this-game-app-uuid>'
-node --input-type=module <<'NODE'
-import { readFile } from 'node:fs/promises';
-import { homedir } from 'node:os';
-import { join } from 'node:path';
-const base = 'https://studio.superrare.com';
-const config = JSON.parse(await readFile(join(homedir(), '.rare-profile/config.json'), 'utf8'));
-// Use canonical Studio explicitly; older CLI config may still say beta.rare.xyz.
-if (!/^[0-9a-f-]{36}$/i.test(process.env.APP_ID ?? '')) throw new Error('Set APP_ID');
-const exchanged = await fetch(`${base}/auth/cli/exchange`, {
-  method: 'POST', headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ token: config.token }),
-});
-if (!exchanged.ok) throw new Error(`Creator exchange failed: ${exchanged.status}`);
-const auth = await exchanged.json();
-if (!auth.sessionToken || !auth.scopes?.includes('apps')) throw new Error('Creator apps scope required');
-for (const suffix of ['versions', 'events']) {
-  const response = await fetch(`${base}/api/v1/games/${process.env.APP_ID}/scoring/${suffix}`, {
-    headers: { Authorization: `Bearer ${auth.sessionToken}` },
-  });
-  if (!response.ok) throw new Error(`${suffix} failed: ${response.status}`);
-  console.log(JSON.stringify({ resource: suffix, data: await response.json() }, null, 2));
-}
-NODE
+rare-profile app update <target-app-id> \
+  --zip ./dist/target-rush.zip --max-attempts 20 --json
+rare-profile app update <color-app-id> \
+  --zip ./dist/color-match.zip --max-attempts 20 --json
 ```
 
-A session JWT lasts 15 minutes; exchange again when expired. Do not print, commit, upload, paste into an issue, or bundle either credential. The command prints scoring metadata, not the credentials. After dashboard setup, `verifierVersions` contains the version's `id`, `deployment_id`, config and digest. Record the version created for your current deployment, not simply any older version in the array.
+The CLI uploads each ZIP, resolves the app's current deployment using the creator's `products` scope, registers that deployment's verifier/config, creates a scoring event and verifies it is active. The result reports `deploymentId`, `verifierVersionId` and `eventId`. `authPolicy` defaults to `authenticated`; this accepts verified wallets and Studio profiles. `--max-attempts 20` limits attempts per scoring identity, not per human. These are creator operations; they do not buy credits, transfer USDC or start a paid play.
 
-### Version registration and bounded events
+The app creator must own both apps and use a CLI token with the default `apps` and `products` scopes. The CLI exchanges its PAT for a scoped session internally. Never pass, print or commit the PAT or session JWT.
 
-The exact mutation contracts are:
+### Recover scorer setup without another deployment
 
-```http
-POST https://studio.superrare.com/api/v1/games/<app-id>/scoring/versions
-Authorization: Bearer <creator-session-jwt>
-Content-Type: application/json
-
-{"deploymentId":"<current-published-deployment-uuid>","config":{"maxTicks":240,"roundTicks":200,"game":"target-rush"}}
-```
-
-Use the complete generated scoring config for your selected game; do not assume optional or future rules can be omitted. For Color Match use its generated variant. The response is `{ "version": "1", "verifierVersion": { "id": "...", ... } }`. Registration requires the **current active deployment**, its root verifier and passing initial conformance. The same deployment/config digest can return the existing version. Conformance is technical validation, not fairness approval.
-
-The deployment UUID is not the app ID, app update's integer `version`, or app hostname. After dashboard setup it appears in version metadata. For direct publication, creator-authenticated `POST /api/commerce` with `{ "action": "my-products" }` returns `{ "products": [...] }`; select your app by `id` and read its `current_deployment_id`. **That lookup requires `products` scope for a CLI token**, beyond `apps` for scoring management. New CLI token settings expose only the default scopes, so an ordinary new token cannot use this lookup. Use your normal Studio browser session below (unrestricted creator auth), or an existing appropriately scoped token. Never request database/service-role access or claim that re-login supplies `products` scope.
-
-For a bounded event, use the current verifier version and choose future ISO-8601 bounds with a timezone. The following request illustrates a one-week UTC contest window; **replace these dates if they are not in the future**, and publish the equivalent local times in your contest terms:
-
-```http
-POST https://studio.superrare.com/api/v1/games/<app-id>/scoring/events
-Authorization: Bearer <creator-session-jwt>
-Content-Type: application/json
-
-{"verifierVersionId":"<this-deployment-verifier-version-uuid>","startsAt":"2026-11-01T00:00:00Z","endsAt":"2026-11-08T00:00:00Z","maxAttempts":3,"authPolicy":"authenticated"}
-```
-
-These are actual HTTP contracts, not hypothetical `rare-profile scoring ...` commands. **For an ordinary organizer with a new apps-scoped CLI token, use the browser-session path:** sign in as the app creator at `https://studio.superrare.com`, open that site's developer console, review the following script, replace its app ID/config/window, and run it there. It uses the site's existing HttpOnly session cookie (`credentials: 'same-origin'`), not a copied token. Do not run it on the game's origin, another site or an untrusted page. Paste your selected ZIP's complete `scoring-config.json` as `scoringConfig`; the shown object is Target Rush's current default.
-
-```js
-{
-  if (location.origin !== 'https://studio.superrare.com') throw new Error('Use the Studio website');
-  const appId = '<this-game-app-uuid>';
-  const scoringConfig = { maxTicks: 240, roundTicks: 200, game: 'target-rush' };
-  const startsAt = '2026-11-01T00:00:00Z';
-  const endsAt = '2026-11-08T00:00:00Z';
-  async function creatorRequest(path, body) {
-    const response = await fetch(path, {
-      method: 'POST', credentials: 'same-origin',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    if (!response.ok) throw new Error(`${path} failed: ${response.status}`);
-    return response.json();
-  }
-  const owned = await creatorRequest('/api/commerce', { action: 'my-products' });
-  const app = owned.products?.find(product => product.id === appId);
-  if (!app?.current_deployment_id) throw new Error('Owned published app not found');
-  const path = `/api/v1/games/${appId}/scoring`;
-  const version = await creatorRequest(`${path}/versions`, {
-    deploymentId: app.current_deployment_id, config: scoringConfig,
-  });
-  if (!version.verifierVersion?.id) throw new Error('Invalid verifier response');
-  const event = await creatorRequest(`${path}/events`, {
-    verifierVersionId: version.verifierVersion.id, startsAt, endsAt,
-    maxAttempts: 3, authPolicy: 'authenticated',
-  });
-  console.log({ deploymentId: app.current_deployment_id, verifierVersion: version.verifierVersion, event: event.event });
-}
-```
-
-**Every execution creates an event.** After an uncertain reply, inspect the authenticated event list before rerunning. The script does not move money. Repeat separately for Color Match with its own ID and generated config. Adjust the dates and policy before launch; avoid overlapping smoke events as explained below.
-
-**Optional terminal path for an existing broader-scoped token:** the following complete command obtains the current deployment through `my-products`, reads the matching config directly from the built ZIP, registers its version, and creates a bounded event. It requires a CLI token that already has **`apps` and `products`** scopes and the `unzip` utility; a new default token will correctly fail its scope check. Set your app ID/artifact and reviewed future dates; repeat separately for the second app. Do not blindly rerun after an uncertain event response.
+If upload succeeded but verifier/event registration failed, the CLI error includes the app ID and retry command. Do not run `app update` again just to retry scoring: that creates another immutable deployment. Run `app scoring` against the same artifact and attempt policy:
 
 ```sh
-export APP_ID='<this-game-app-uuid>'
-export GAME_ZIP='./dist/target-rush.zip'
-export EVENT_START='2026-11-01T00:00:00Z'
-export EVENT_END='2026-11-08T00:00:00Z'
-node --input-type=module <<'NODE'
-import { readFile } from 'node:fs/promises';
-import { homedir } from 'node:os';
-import { join } from 'node:path';
-import { execFileSync } from 'node:child_process';
-const base = 'https://studio.superrare.com';
-const saved = JSON.parse(await readFile(join(homedir(), '.rare-profile/config.json'), 'utf8'));
-const appId = process.env.APP_ID;
-if (!/^[0-9a-f-]{36}$/i.test(appId ?? '')) throw new Error('Set APP_ID');
-if (!process.env.GAME_ZIP) throw new Error('Set GAME_ZIP');
-const startsAt = process.env.EVENT_START;
-const endsAt = process.env.EVENT_END;
-if (!startsAt || !endsAt || !Number.isFinite(Date.parse(startsAt))
-  || !Number.isFinite(Date.parse(endsAt)) || Date.parse(startsAt) >= Date.parse(endsAt)
-  || Date.parse(endsAt) <= Date.now()) throw new Error('Set a valid future event window');
-const scoringConfig = JSON.parse(execFileSync('unzip', ['-p', process.env.GAME_ZIP, 'scoring-config.json'], { encoding: 'utf8' }));
-const exchange = await fetch(`${base}/auth/cli/exchange`, {
-  method: 'POST', headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ token: saved.token }),
-});
-if (!exchange.ok) throw new Error(`Creator exchange failed: ${exchange.status}`);
-const auth = await exchange.json();
-if (!auth.sessionToken || !['apps', 'products'].every(scope => auth.scopes?.includes(scope))) {
-  throw new Error('Creator apps and products scopes required');
-}
-async function post(path, body) {
-  const response = await fetch(`${base}${path}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${auth.sessionToken}` },
-    body: JSON.stringify(body),
-  });
-  const result = await response.json();
-  if (!response.ok) throw new Error(`${path} failed (${response.status}): ${JSON.stringify(result)}`);
-  return result;
-}
-const owned = await post('/api/commerce', { action: 'my-products' });
-const app = owned.products?.find(product => product.id === appId);
-if (!app?.current_deployment_id) throw new Error('Owned published app not found');
-const path = `/api/v1/games/${appId}/scoring`;
-const version = await post(`${path}/versions`, {
-  deploymentId: app.current_deployment_id, config: scoringConfig,
-});
-if (!version.verifierVersion?.id) throw new Error('Invalid verifier response');
-const event = await post(`${path}/events`, {
-  verifierVersionId: version.verifierVersion.id, startsAt, endsAt,
-  maxAttempts: 3, authPolicy: 'authenticated',
-});
-console.log(JSON.stringify({ deploymentId: app.current_deployment_id, verifierVersion: version.verifierVersion, event: event.event }, null, 2));
-NODE
+rare-profile app scoring <target-app-id> \
+  --zip ./dist/target-rush.zip --max-attempts 20 --json
+rare-profile app scoring <color-app-id> \
+  --zip ./dist/color-match.zip --max-attempts 20 --json
 ```
 
-Set `APP_ID`, `GAME_ZIP`, `EVENT_START` and `EVENT_END` to reviewed values before running it. This mutation creates an event; it does not pay, grant credits, or run the game. The response contains `event.id`. There is no event-mutation/closing endpoint documented by this workflow. Avoid overlapping active events: active-event discovery selects the **newest created active event whose window contains now for the current deployment**. A future-window event does not disable an older unbounded smoke event; that older event can be selected before the contest starts or after it ends. For a real bounded launch, use a fresh deployment with only the intended bounded event, and verify discovery outside and inside the window. Keep smoke events out of prize eligibility regardless.
+This command registers scoring for the current deployment without uploading it. It returns the already-active event rather than creating a duplicate if that deployment already has one. Keep the exact ZIP used for the update so its scoring config stays matched to the deployed verifier.
 
-Public discovery needs no creator credential:
+Public event discovery requires no creator credential:
 
 ```sh
 curl --fail-with-body 'https://<target-app-hostname>/api/v1/games/<target-app-id>/scoring/active-event'
 curl --fail-with-body 'https://<color-app-hostname>/api/v1/games/<color-app-id>/scoring/active-event'
 ```
 
-Successful responses contain `{ "version": "1", "eventId": "..." }`. HTTP 404 can mean no currently active event for this deployment; it is not permission to charge for a new attempt while scoring is unavailable.
+Each success should return that app's active `eventId`. A 404 means no active event was found for the current deployment; do not enable paid play or substitute a client score when scoring is unavailable.
+
+### Contest-window limitation
+
+The CLI-created integration events have no start/end bounds. They are suitable for the unpaid integration smoke, not a dated contest. The CLI does not currently expose bounded event creation. For a prize contest, publish explicit UTC bounds and reviewed rules through the Studio creator workflow. Do not add a future bounded event beside an unbounded event and assume it will replace it: the older event may still be selected outside the new window. Use a fresh deployment with only the intended bounded event, and verify event discovery outside and inside its window. An event's attempt cap is per scoring identity, not a one-human limit.
 
 ## 7. Player flow: four separate approvals and authoritative results
 
@@ -428,7 +283,7 @@ Do not clear browser storage while recovering a payment/start. A different app o
 - [ ] Confirm both ZIPs have the required root client/config/verifier/scoring artifacts and different game variants.
 - [ ] Check app IDs/origins against CLI deployment responses; check both approved registrations cost `1` in the same group.
 - [ ] Inspect chain, USDC, controlled treasury, `10000`/`10`, purchase pause and new-use pause states before showing a purchase button.
-- [ ] Update both original app IDs; publish each current deployment's matching verifier/event and verify its active-event endpoint.
+- [ ] Update both original app IDs with rare-profile beta.4; verify the CLI-reported deployment, verifier and event IDs and each origin's active-event endpoint.
 - [ ] Open each deployed HTTPS page. Check controls, game variant and errors. No transfer, claim, consent, reservation or run should begin on page load/reload.
 - [ ] Click Connect and verify popup sign-in works on the registered origin. Connecting alone changes neither balance nor transaction history. A fresh wallet reads zero; do not grant test credits to manufacture success.
 - [ ] Open/cancel a purchase UI before wallet approval if testing cancellation; opening or quoting is not a successful purchase. Preserve any pending quote/intent information.
@@ -455,8 +310,8 @@ Do not falsify an end-to-end result if no real payer approved a transfer. Report
 
 1. Make the client/verifier changes together. Build new, deliberately named artifacts; replace an existing output only intentionally.
 2. Drain/reconcile outstanding paid runs and plan a maintenance window; do not update a live cash-prize contest casually. An app update supersedes the old deployment, and an event pinned to it is not automatically valid for the replacement.
-3. Use `rare-profile app update <same-app-id> --zip <new-game.zip> --json`. Keep the existing app ID/origin/group; check that the ZIP still includes its root verifier.
-4. Register the replacement's verifier/config and create its own event. Discovery selects only the current deployment. A new event also has its own attempt count; replacing events is not a way to preserve a contest-wide cap automatically.
+3. Use rare-profile beta.4 to run `rare-profile app update <same-app-id> --zip <new-game.zip> --max-attempts <n> --json`. Keep the existing app ID/origin/group; check that the ZIP still includes its root verifier and matching scoring config.
+4. Verify the CLI-reported deployment/verifier/event IDs and public active-event discovery. If scorer setup fails after upload, use `rare-profile app scoring <same-app-id> --zip <same-game.zip> --max-attempts <n> --json` rather than redeploying.
 5. Verify active-event discovery and unpaid connection before permitting a newly confirmed paid start. Never point the new build at an old deployment's event to silence an error.
 6. Re-run the approved acceptance subset. Inspect the authoritative shared balance; updates do not reset purchased balances or create packs.
 
