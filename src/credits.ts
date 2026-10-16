@@ -443,7 +443,7 @@ export class Credits {
       // Keep the exact quote and an ambiguous-outcome marker durable before the SDK opens hosted checkout.
       const pending = { ...record, confirmPayment: false, outcomeUnknown: true };
       this._saveRecord(pending);
-      this._say('Opening hosted wallet checkout in a popup. No transfer is submitted until the hosted wallet asks for explicit approval.');
+      this._say('Opening embedded hosted wallet checkout. No transfer is submitted until the hosted wallet asks for explicit approval.');
       const intent = await this.client.actions.transfer({
         chainId: 1,
         to: quote.treasuryAddress,

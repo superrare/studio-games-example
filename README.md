@@ -51,7 +51,7 @@ A per-game public configuration has this shape:
   "apiUrl": "https://api.superrare.com",
   "connectUrl": "https://connect.superrare.com",
   "appOrigin": "https://<this-games-exact-hostname>",
-  "display": "popup",
+  "display": "embed",
   "game": "target-rush"
 }
 ```
@@ -88,8 +88,8 @@ Local HTTP is for development, not paid-flow acceptance: Studio registers exact 
 
 ## Integration boundaries
 
-- Published Connect 0.9.0-beta.0 supplies popup authentication, scoped group credits, payment intents, explicit paid-start consent/recovery, server-run start and authoritative scoring reads. Sign-in uses `auth.login()`; `game.connect()` then authorizes through the Studio API without opening another hosted flow. The SDK supports opt-in embedding, but these examples deliberately keep popup authentication.
-- The example calls the SDK's `getActiveScoringEvent()` and `getServerLeaderboard()` on the deployed game's own origin. Its server-run client uses that origin too, so WebSocket tickets are used on the correct host. Credit operations use canonical Studio. No copied scoring HTTP client or SDK checkout is required.
+- Published Connect 0.9.0-beta.0 supplies embedded sign-in and checkout, scoped group credits, payment intents, explicit paid-start consent/recovery, server-run start and authoritative scoring reads. The Connect transport uses a merchant-owned modal iframe; `auth.login()` opens it from the sign-in action, while `game.connect()` remains an API-only authorization exchange. No login or authorization step buys credits or starts a paid play.
+- The example calls the SDK's `getActiveScoringEvent()` and `getServerLeaderboard()` on the deployed game's own origin. Its server-run client uses that origin too, so WebSocket tickets are used on the correct host. Credit operations use canonical Studio. No copied scoring HTTP client or separate checkout implementation is required.
 - Saved purchase, consent, paid-start, server-run and completion records are recovery evidence, not permission to initiate another payment or charge. Preserve original keys after uncertain outcomes and keep records scoped to wallet, group, app and origin.
 - Unreadable purchase recovery records block replacement purchases instead of treating the old payment as absent. Memory-only consent blocks paid start until durable recovery is restored. JavaScript/CSS asset names are content-hashed for Studio's immutable asset cache.
 - A fresh account starts with zero purchased credits. No seeded credits, automatic grants, free paid-start fallback or automated prize payouts are included.
@@ -105,18 +105,18 @@ The public top score spans completed events/builds for an app. It is not an even
 - [Target Rush](https://y4prnpya.srstudio.dev) — app `25627f68-6ef5-47e3-826d-6632bc6a1f50`
 - [Color Match](https://q3s9bpab.srstudio.dev) — app `83868300-84d5-419b-acac-f432cc49d1e9`
 
-These are mainnet integration-test apps, not free-play demos. Both are deployment version `4`, published with `@rareprotocol/rare-profile@0.1.0-beta.4`, and use the shared group at **0.01 USDC / 10 credits**, **1 credit / round**. Do not send money merely to inspect them; creator publishing did not transfer money or start paid play.
+These are mainnet integration-test apps, not free-play demos. Both are deployment version `7`, published with `@rareprotocol/rare-profile@0.1.0-beta.4`, and use the shared group at **0.01 USDC / 10 credits**, **1 credit / round**. The game-owned Connect modal embeds hosted login and checkout. Do not send money merely to inspect them; creator publishing did not transfer money or start paid play.
 
 | Game | Deployment | Verifier version | Active scoring event |
 | --- | --- | --- | --- |
-| Target Rush | `12612eed-b1d1-4feb-b423-e0e32b6ab788` | `0045fd36-6e75-4f62-8bab-849a4922765e` | `9c12be1f-802d-4462-bcb7-b95145857e0d` |
-| Color Match | `968b2094-05e1-4f63-9c09-95032871ecf0` | `1b3c01a6-7b5d-4f26-a93d-3b3ad20dedd0` | `fa439309-6efb-4f78-8b99-fb42a3a0db6c` |
+| Target Rush | `304e95d3-e2aa-47cb-9bda-1d7dfa95b074` | `4d3fb3b0-dbfe-48f7-9ed6-a3a932dd0f8f` | `c649fee9-e457-4aeb-9a5b-14dbc478df71` |
+| Color Match | `b0fa7102-8707-4410-86c5-35053306f0f0` | `6099783b-7558-4b3e-ba35-9865371ae72b` | `e43c8e57-deb1-483d-9c71-391a25bca963` |
 
-The public active-event endpoint returned each listed event ID. Both deployed pages rendered signed out with the expected game title and controls and no browser console errors. No sign-in, purchase, paid play or wallet action was exercised; those still require the payer's explicit approval.
+Both deployed `/config.json` files report `display: "embed"` and both public active-event endpoints returned the event IDs above. The hosted sign-in page rendered inside the modal in each game. Close and Escape removed the iframe; reopening created a fresh login intent. The mobile modal fit a 390×844 viewport without horizontal overflow. No sign-in was completed, wallet action/payment or paid play was performed.
 
-The previous 0.8.0 build's checks covered its artifact builds, typecheck, 13 focused regressions, bundled verifier rounds (including wrong-color rejection), verifier conformance, active-event and leaderboard reads, and signed-out rendering. The new source passed `pnpm typecheck` and all 12 repository tests before deployment.
+`pnpm typecheck` and all 12 repository tests passed. Both game ZIPs were rebuilt and published as version 7 after the modal lifecycle and mobile sizing fixes. Browser JavaScript console errors were absent; canceled iframe navigations reported expected `ERR_ABORTED` request records.
 
-Not yet exercised: completed player authentication, a real USDC transfer/claim, paid rounds, and the purchased-balance transition across both games. Follow the runbook's separately approved mainnet acceptance checklist before treating this as payment/gameplay acceptance.
+Not yet exercised: completed player authentication, the embedded-storage-unavailable response, a real USDC transfer/claim, paid rounds, and the purchased-balance transition across both games. Follow the runbook's separately approved mainnet acceptance checklist before treating this as payment/gameplay acceptance.
 
 ## License
 

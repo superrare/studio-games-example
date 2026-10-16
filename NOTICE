@@ -11,7 +11,7 @@ Original copyright: Copyright (c) 2026 SuperRare
 Original license: MIT (retained in LICENSE)
 
 This standalone example adds Color Match, wallet-isolated recovery storage,
-published-package imports, popup-only authentication, SDK-backed public scoring
+published-package imports, embedded authentication/checkout, SDK-backed public scoring
 reads, and a self-contained two-game archive builder. No SDK checkout or
 unpublished SDK build is required.
 

@@ -35,7 +35,7 @@ cd studio-games-example
 pnpm install
 ```
 
-The repository pins the published **`@rareprotocol/connect@0.9.0-beta.0`** npm prerelease and its lockfile, not an unpublished SDK checkout. The SDK supplies popup sign-in, group credits, explicit consent/recovery, server-run start and public authoritative scoring reads. These examples call `getActiveScoringEvent()` and `getServerLeaderboard()` through a client pointed at the deployed game's own origin; community leaderboards are not a substitute for server results. Sign in with `auth.login()` before the API-only `game.connect()` authorization step. Native embedding is available in this beta but is deliberately not enabled in these popup examples.
+The repository pins the published **`@rareprotocol/connect@0.9.0-beta.0`** npm prerelease and its lockfile, not an unpublished SDK checkout. The SDK supplies embedded sign-in and hosted checkout, group credits, explicit consent/recovery, server-run start and public authoritative scoring reads. These examples call `getActiveScoringEvent()` and `getServerLeaderboard()` through a client pointed at the deployed game's own origin; community leaderboards are not a substitute for server results. `auth.login()` and purchases open in the game-owned modal iframe; `game.connect()` remains an API-only authorization step. Embedded sessions depend on browser support for third-party iframe storage.
 
 ### Install rare-profile CLI beta.4
 
@@ -175,7 +175,7 @@ Make two local config files from `examples/target-rush.example.json` and `exampl
   "apiUrl": "https://api.superrare.com",
   "connectUrl": "https://connect.superrare.com",
   "appOrigin": "https://<target-app-hostname>",
-  "display": "popup",
+  "display": "embed",
   "game": "target-rush"
 }
 ```
@@ -252,7 +252,7 @@ The CLI-created integration events have no start/end bounds. They are suitable f
 
 The deployed game owns visible UI and recovery records, not the credit ledger. Never replace these steps with an arbitrary USDC transfer or a browser-submitted score.
 
-1. **Sign in explicitly.** Connect's popup handles identity/wallet interaction. The app exchanges the Connect credential for a short-lived `GameAuthorization` bound to wallet, group, app and exact origin. Login/connection must not buy, reserve or start a play. Reuse valid sessions, and discard cached authorizations when the account changes.
+1. **Sign in explicitly.** Connect's embedded modal handles identity/wallet interaction. The app exchanges the Connect credential for a short-lived `GameAuthorization` bound to wallet, group, app and exact origin. Login/connection must not buy, reserve or start a play. Reuse valid sessions, and discard cached authorizations when the account changes. Some browsers restrict third-party storage in embedded frames; if embedded login is unavailable, the app reports it without silently switching to a popup.
 2. **Choose a purchase explicitly.** Show the current offer and balances. Create an account-bound quote *before* transferring. Persist the quote, wallet/scope, snapshotted terms and expiry. Confirm chain `1`, canonical USDC, quoted treasury and atomic amount. The player reviews the **10 credits / 0.01 USDC plus gas** choice in the hosted flow; they separately approve any real wallet action. The quote's wallet must be the payer.
 3. **Claim the payment.** Preserve the hosted transfer intent ID before opening checkout, then the returned transaction hash. The published transfer API uses `currency: "USDC"` and an atomic-unit amount string. Only Studio's successful claim of that exact quote/hash and authoritative balance establish that credits exist; wallet success UI alone does not. A qualifying payment normally must be mined within the quote's 30-minute window and above its snapshotted lower block bound. Earlier qualifying payments can be claimed after expiry/purchase pause. Canonical inclusion is checked at the current head, not finalized settlement; later reorgs are not automatically reversed.
 4. **Confirm each credit spend explicitly.** Fetch current terms, show **Play — spend 1 credit** (or the returned actual cost), and request one-use consent only after that choice. Persist the attempt key, fingerprint, expected cost, original start fields and consent before paid start. Studio reserves the cost and captures the debit once initialization succeeds. A valid paid `PlaySession` admits one server-managed round, not a free-session fallback or multiple adapters.
@@ -264,7 +264,7 @@ Available, total purchased and reserved balances are distinct. New wallets have 
 
 | Situation | Recover the original operation | Never do this |
 | --- | --- | --- |
-| Checkout popup closed / transfer reply lost | Read the saved intent through `client.intents.get({ intentId })`; preserve quote and hash | Assume no transfer happened and send another |
+| Embedded checkout closed / transfer reply lost | Read the saved intent through `client.intents.get({ intentId })`; preserve quote and hash | Assume no transfer happened and send another |
 | Claim pending (`PAYMENT_PENDING`) / verification outage | Retry the **same** purchase claim/hash; refresh authoritative balance | Create a replacement payment to fix a timeout |
 | Consent/start reply lost | `recoverStart` with the original request fields and idempotency key, saved consent/fingerprint/cost | Generate a new key, clear uncertain evidence, or silently spend again |
 | Scoring run start / socket reply lost | Recover with the same event, paid session and server-run key; obtain a fresh one-time ticket | Reuse an already consumed WebSocket ticket or buy a second play |
@@ -285,8 +285,8 @@ Do not clear browser storage while recovering a payment/start. A different app o
 - [ ] Inspect chain, USDC, controlled treasury, `10000`/`10`, purchase pause and new-use pause states before showing a purchase button.
 - [ ] Update both original app IDs with rare-profile beta.4; verify the CLI-reported deployment, verifier and event IDs and each origin's active-event endpoint.
 - [ ] Open each deployed HTTPS page. Check controls, game variant and errors. No transfer, claim, consent, reservation or run should begin on page load/reload.
-- [ ] Click Connect and verify popup sign-in works on the registered origin. Connecting alone changes neither balance nor transaction history. A fresh wallet reads zero; do not grant test credits to manufacture success.
-- [ ] Open/cancel a purchase UI before wallet approval if testing cancellation; opening or quoting is not a successful purchase. Preserve any pending quote/intent information.
+- [ ] Click **Sign in** and verify embedded sign-in works on the registered origin. Connecting alone changes neither balance nor transaction history. A fresh wallet reads zero; do not grant test credits to manufacture success. Check that an unsupported embedded-storage case reports the limitation without opening a popup.
+- [ ] Open/cancel embedded checkout before wallet approval if testing cancellation; opening or quoting is not a successful purchase. Preserve any pending quote/intent information.
 - [ ] Confirm disabled play/no active-event/insufficient-credit cases explain the issue instead of using an unpaid fallback or local official score.
 
 These checks can establish deployment/auth/configuration, **not** successful paid acceptance. Do not say that a built ZIP or a successful creator API request proves payment or gameplay.
