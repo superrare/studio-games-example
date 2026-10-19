@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       '@rareprotocol/connect':
-        specifier: 0.9.0-beta.0
-        version: 0.9.0-beta.0
+        specifier: 0.10.0
+        version: 0.10.0
       zod:
         specifier: 4.3.6
         version: 4.3.6
@@ -345,8 +345,8 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@rareprotocol/connect@0.9.0-beta.0':
-    resolution: {integrity: sha512-FF0gaPbr9qw0LGyDbw2I85znC5MKe3sO3RsZrlYLKX7p8ggb/UAdpNRfeXkfroMvdaNiX9G3hKC3e313pQ+VPA==}
+  '@rareprotocol/connect@0.10.0':
+    resolution: {integrity: sha512-TlPaG6LKFLJx044FMK2WtnmoCwTsl8C043q9+nw1zcQQrcSysyp8jRMdXXJ3hHb+Xr+bA1fvQMzpmXcUIrVJtw==}
 
   '@types/node@22.20.5':
     resolution: {integrity: sha512-U2+DNr+wSjpsTS/wZGYHq7GcwfuSmKiKvoPvK22zwTlRhU91yOniN4qRR5KhIjvif7ysw/dz/hKmfDH0Ris4aA==}
@@ -546,7 +546,7 @@ snapshots:
   '@esbuild/win32-x64@0.28.2':
     optional: true
 
-  '@rareprotocol/connect@0.9.0-beta.0':
+  '@rareprotocol/connect@0.10.0':
     dependencies:
       zod: 4.6.7
 

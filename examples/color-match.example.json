@@ -5,6 +5,6 @@
   "apiUrl": "https://api.superrare.com",
   "connectUrl": "https://connect.superrare.com",
   "appOrigin": "https://color-match.example.invalid",
-  "display": "popup",
+  "display": "embed",
   "game": "color-match"
 }

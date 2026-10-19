@@ -1,25 +1,26 @@
 # Studio games example
 
-Two distinct browser games built from one public repository, using the published **`@rareprotocol/connect@0.9.0-beta.0`** npm package, pinned exactly with its lockfile:
+Two distinct browser games built from one public repository and locally vendored package archives:
 
 - **Target Rush:** click server-issued targets before the round ends.
 - **Color Match:** choose the server-requested color. A wrong choice does not earn a point.
 
-Each game has its own Studio app ID, HTTPS origin, immutable deployment, verifier version and scoring event. Register both apps in **one credit group** to share the same wallet's purchased balance. The example offer is **0.01 USDC for 10 credits on Ethereum mainnet**, with **1 credit per play**. Ethereum network fees are separate and can exceed the pack price.
+Each game has its own Studio app ID, HTTPS origin, immutable deployment, verifier version and scoring event. Register both apps in **one credit group** to share the same wallet's purchased balance. The group owner configures either native ETH or a supported USDC token and pack terms; each purchase quote snapshots the exact currency, amount, token, recipient, wallet and chain. The example charges **1 credit per play**. Network fees are separate.
 
 **This is real payment integration, not a faucet or simulated balance.** Building, previewing, deploying and configuring scoring do not authorize a wallet transfer. Login, buying credits and spending a credit are separate, explicit player actions. Only a completed server result is official. Prizes and contest adjudication remain manual organizer responsibilities; these games are not bot-proof.
 
 ## Start here
 
 Follow the [organizer runbook](docs/organizer-runbook.md) for the complete two-game deployment, recovery and acceptance workflow. It includes the current CLI installation reality, bootstrap app allocation, exact origin registration, verifier/event publication and the optional, separately approved real-mainnet wallet check.
+For a fast one-off creator onboarding flow, use the [arcade creator handoff](docs/creator-handoff.md): creators build under their own accounts, then the organizer registers each ready app in the existing group.
 
 For game implementation and prize integrity, read the [server-verification guide](docs/server-verification.md): the real Worker contract, copy-paste local and bundled-verifier checks, game-specific anti-cheat design, known bot weaknesses, and the manual result-review/payout checklist. Server-verified scores are not proof of human play or automatic prize eligibility.
 
 ### Requirements
 
 - Node.js **22 or newer**, Git, and pnpm **10.11.0** (the repository's declared package manager).
-- A Studio creator account and the feature-enabled `rare-profile` CLI for deployment. The runbook pins the merged source commit while the required beta is not yet published to npm.
-- For an explicitly approved paid check only: a wallet with Ethereum USDC and sufficient Ethereum gas, and a treasury the organizer controls.
+- A Studio creator account and the published `rare-profile` CLI **0.1.0-beta.7 or newer** for deployment.
+- For an explicitly approved paid check only: a wallet with the configured ETH or USDC asset and sufficient gas, and a treasury the organizer controls.
 
 ```sh
 git clone https://github.com/superrare/studio-games-example.git
@@ -27,9 +28,10 @@ cd studio-games-example
 corepack enable
 corepack prepare pnpm@10.11.0 --activate
 pnpm install
+npm install --global @rareprotocol/rare-profile@0.1.0-beta.7
 ```
 
-The dependency is a published npm release; no Connect SDK checkout, branch build, private registry or Privy application secret is needed.
+The example pins published **Connect 0.10.0** in its lockfile. The CLI command above installs published **Rare Profile 0.1.0-beta.7**; no SDK checkout, local package archive, private registry or Privy application secret is needed.
 
 ### Configure and build
 
@@ -45,7 +47,7 @@ A per-game public configuration has this shape:
   "apiUrl": "https://api.superrare.com",
   "connectUrl": "https://connect.superrare.com",
   "appOrigin": "https://<this-games-exact-hostname>",
-  "display": "popup",
+  "display": "embed",
   "game": "target-rush"
 }
 ```
@@ -82,11 +84,14 @@ Local HTTP is for development, not paid-flow acceptance: Studio registers exact 
 
 ## Integration boundaries
 
-- Published Connect 0.9.0-beta.0 supplies popup authentication, scoped group credits, payment intents, explicit paid-start consent/recovery, server-run start and authoritative scoring reads. Sign-in uses `auth.login()`; `game.connect()` then authorizes through the Studio API without opening another hosted flow. The SDK supports opt-in embedding, but these examples deliberately keep popup authentication.
-- The example calls the SDK's `getActiveScoringEvent()` and `getServerLeaderboard()` on the deployed game's own origin. Its server-run client uses that origin too, so WebSocket tickets are used on the correct host. Credit operations use canonical Studio. No copied scoring HTTP client or SDK checkout is required.
-- Saved purchase, consent, paid-start, server-run and completion records are recovery evidence, not permission to initiate another payment or charge. Preserve original keys after uncertain outcomes and keep records scoped to wallet, group, app and origin.
-- Unreadable purchase recovery records block replacement purchases instead of treating the old payment as absent. Memory-only consent blocks paid start until durable recovery is restored. JavaScript/CSS asset names are content-hashed for Studio's immutable asset cache.
+- The locally supplied Connect SDK archive provides embedded Connect (the default) or a configured popup, scoped group credits, payment intents, explicit paid-start consent/recovery, server-run start and authoritative scoring reads. If embed is unavailable, the app exposes an explicit popup fallback; it never opens a popup silently. `game.connect()` authorizes through the Studio API without another hosted flow.
+- The player shell has one Play entry point, local Practice with no paid-start or score submission calls, a wallet menu with purchase history/recovery, and separate server-verified versus unrecorded practice results. A Play after sign-in or checkout requires fresh spend consent.
+- The example calls the SDK's `getActiveScoringEvent()` and `getServerLeaderboard()` on the deployed game's own origin. Its server-run client uses that origin too, so WebSocket tickets are used on the correct host. Credit operations use canonical Studio. No copied scoring HTTP client is required.
+- Saved purchase, consent, paid-start, server-run and completion records are recovery evidence, not permission to initiate another payment or charge. Preserve original keys after uncertain outcomes and keep records scoped to wallet, group, app and origin. Legacy USDC recovery records migrate losslessly to the currency-aware storage version.
 - A fresh account starts with zero purchased credits. No seeded credits, automatic grants, free paid-start fallback or automated prize payouts are included.
+- The group operator can explicitly allocate credits using `rare-profile credit-group grant`; see the [operator allocation workflow](docs/organizer-runbook.md#operator-credit-allocations). Allocations need no payment but use the same shared balance and normal per-play consent. The player app cannot allocate credits.
+- Wallet leaderboard rows prefer forward-verified ENS names when available, with an address fallback and full-wallet tooltip. ENS metadata never changes score, rank or wallet identity.
+- Operators can read time-bounded per-game captured plays and consumed credits through `rare-profile credit-group usage`; see the [usage report workflow](docs/organizer-runbook.md#operator-usage-reports). These counters are not prize amounts or revenue.
 
 ## Publishing and contest operations
 
@@ -99,13 +104,11 @@ The public top score spans completed events/builds for an app. It is not an even
 - [Target Rush](https://y4prnpya.srstudio.dev)
 - [Color Match](https://q3s9bpab.srstudio.dev)
 
-These are mainnet integration-test deployments, not free-play demos. Both use one enabled credit group at **0.01 USDC / 10 credits**, **1 credit / round**, and have separate deployment-pinned verifiers and authenticated scoring events. Do not send money merely to inspect the example.
+These are mainnet integration-test deployments, not free-play demos. Both use one enabled credit group and separate deployment-pinned verifiers and authenticated scoring events. The current source changes are not deployed; do not send money merely to inspect the existing pages.
 
-The source now uses the published Connect beta. These URLs still represent the original 0.8.0 deployments until the organizer rebuilds, redeploys and republishes their deployment-pinned verifier/events using the runbook; changing the dependency does not update live games automatically.
+The source now has a single Play flow, embedded Connect, local Practice, wallet and purchase recovery, and currency-aware purchase handling. Rebuild, redeploy and republish each deployment-pinned verifier/event before using these changes on a live app.
 
-Original 0.8.0 deployment check: both artifact builds, typecheck, 13 focused regressions, both packaged verifier rounds (including rejection of a wrong color), production verifier conformance/event publication, live active-event and empty server-leaderboard reads, desktop/mobile signed-out rendering, hosted Connect sign-in surfaces with the correct initiating origin, and cancellation without payment or paid-start requests.
-
-Not yet exercised: completed player authentication, a real USDC transfer/claim, paid rounds, and the purchased-balance transition across both games. Those require the payer's explicit wallet approval; creator deployment credentials are not a substitute. Follow the runbook's separately approved mainnet acceptance checklist before treating this as payment/gameplay acceptance.
+The original 0.8.0 deployment check was performed before these source changes. It does not verify native ETH checkout, the new player shell, or the current local package archives. No new authentication, purchase, paid-round or wallet flow is claimed exercised here.
 
 ## License
 

@@ -13,7 +13,7 @@ export const configurationSchema = z.object({
   apiUrl: originSchema,
   connectUrl: originSchema,
   appOrigin: originSchema,
-  display: z.literal('popup'),
+  display: z.enum(['embed', 'popup']).default('embed'),
   game: z.enum(['target-rush', 'color-match']),
   siblingUrl: z.string().url().refine((value) => {
     const url = new URL(value);

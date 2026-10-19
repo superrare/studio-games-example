@@ -7,6 +7,9 @@ import { parseConfiguration } from '../src/config.js';
 import { packageGame } from './package-game.js';
 
 async function main(): Promise<void> {
+  const packageDefinition = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8')) as {
+    dependencies?: Record<string, string>;
+  };
   const args = process.argv.slice(2);
   const { values } = parseArgs({ args: args[0] === '--' ? args.slice(1) : args,
     options: { config: { type: 'string' }, output: { type: 'string' }, force: { type: 'boolean', default: false } }, strict: true });
@@ -26,7 +29,7 @@ async function main(): Promise<void> {
     await writeFile(temporary, archive, { flag: 'wx' });
     await rename(temporary, output);
   } finally { await rm(temporary, { force: true }); }
-  process.stdout.write(`Game: ${configuration.game}\nArchive: ${output}\nSDK: @rareprotocol/connect@0.9.0-beta.0 (published npm package)\nSHA-256: ${createHash('sha256').update(archive).digest('hex')}\nSize: ${archive.byteLength} bytes\n`);
+  process.stdout.write(`Game: ${configuration.game}\nArchive: ${output}\nConnect dependency: ${packageDefinition.dependencies?.['@rareprotocol/connect'] ?? 'missing'}\nSHA-256: ${createHash('sha256').update(archive).digest('hex')}\nSize: ${archive.byteLength} bytes\n`);
 }
 void main().catch((error: unknown) => {
   process.stderr.write(`Build failed: ${error instanceof Error ? error.message : 'unknown error'}\n`);

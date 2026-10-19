@@ -25,7 +25,7 @@ export async function packageGame(configuration: Configuration): Promise<GameFil
   const appPath = `assets/app-${createHash('sha256').update(appBundle.contents).digest('hex').slice(0, 16)}.js`;
   const stylePath = `assets/styles-${createHash('sha256').update(stylesheet).digest('hex').slice(0, 16)}.css`;
   const index = template.replace('<head>', `<head>\n    <meta name="play-factory-game-id" content="${configuration.appId}">\n    <link data-rare-app-metadata="true" rel="canonical" href="${configuration.appOrigin}/">`)
-    .replace('<title>Studio games · Real shared credits</title>', `<title>${title} · Studio credits</title>`)
+    .replace('<title>Studio games · Player</title>', `<title>${title} · Studio games</title>`)
     .replace('./assets/app.js', `./${appPath}`)
     .replace('./assets/styles.css', `./${stylePath}`);
   return {
