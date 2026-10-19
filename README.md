@@ -1,6 +1,6 @@
 # Studio games example
 
-Two distinct browser games built from one public repository and locally vendored package archives:
+Two distinct browser games built from one public repository using published npm packages:
 
 - **Target Rush:** click server-issued targets before the round ends.
 - **Color Match:** choose the server-requested color. A wrong choice does not earn a point.
@@ -84,7 +84,7 @@ Local HTTP is for development, not paid-flow acceptance: Studio registers exact 
 
 ## Integration boundaries
 
-- The locally supplied Connect SDK archive provides embedded Connect (the default) or a configured popup, scoped group credits, payment intents, explicit paid-start consent/recovery, server-run start and authoritative scoring reads. If embed is unavailable, the app exposes an explicit popup fallback; it never opens a popup silently. `game.connect()` authorizes through the Studio API without another hosted flow.
+- The published Connect SDK provides embedded Connect (the default) or a configured popup, scoped group credits, payment intents, explicit paid-start consent/recovery, server-run start and authoritative scoring reads. If embed is unavailable, the app exposes an explicit popup fallback; it never opens a popup silently. `game.connect()` authorizes through the Studio API without another hosted flow.
 - The player shell has one Play entry point, local Practice with no paid-start or score submission calls, a wallet menu with purchase history/recovery, and separate server-verified versus unrecorded practice results. A Play after sign-in or checkout requires fresh spend consent.
 - The example calls the SDK's `getActiveScoringEvent()` and `getServerLeaderboard()` on the deployed game's own origin. Its server-run client uses that origin too, so WebSocket tickets are used on the correct host. Credit operations use canonical Studio. No copied scoring HTTP client is required.
 - Saved purchase, consent, paid-start, server-run and completion records are recovery evidence, not permission to initiate another payment or charge. Preserve original keys after uncertain outcomes and keep records scoped to wallet, group, app and origin. Legacy USDC recovery records migrate losslessly to the currency-aware storage version.
@@ -108,7 +108,11 @@ These are mainnet integration-test deployments, not free-play demos. Both use on
 
 The source now has a single Play flow, embedded Connect, local Practice, wallet and purchase recovery, and currency-aware purchase handling. Rebuild, redeploy and republish each deployment-pinned verifier/event before using these changes on a live app.
 
-The original 0.8.0 deployment check was performed before these source changes. It does not verify native ETH checkout, the new player shell, or the current local package archives. No new authentication, purchase, paid-round or wallet flow is claimed exercised here.
+The original 0.8.0 deployment check predates the current source. It does not verify current native ETH checkout, authentication or paid play on those hosted apps.
+
+## Published-package verification
+
+Release verification with **Connect 0.10.0** and stable **Rare Profile 0.1.0** covered a frozen dependency install, typechecking, all 13 tests, both game ZIP builds, real production ENS labels in a local browser, local Practice and an authenticated CLI usage report. No live purchase, credit grant or paid round was performed for this release. Local browser checks do not replace acceptance on each registered HTTPS game origin.
 
 ## License
 
