@@ -6,6 +6,12 @@ const originSchema = z.string().url().refine((value) => {
     && !url.hostname.endsWith('.invalid');
 }, 'Use an exact HTTPS origin, not a placeholder, path, or credential-bearing URL');
 
+// Studio checks ordering at database precision; Date.parse would collapse microsecond bounds.
+const leaderboardWindowSchema = z.object({
+  from: z.iso.datetime({ offset: true }),
+  to: z.iso.datetime({ offset: true }),
+}).strict();
+
 export const configurationSchema = z.object({
   appId: z.string().uuid(),
   groupId: z.string().uuid(),
@@ -15,6 +21,7 @@ export const configurationSchema = z.object({
   appOrigin: originSchema,
   display: z.enum(['embed', 'popup']).default('embed'),
   game: z.enum(['target-rush', 'color-match']),
+  leaderboardWindow: leaderboardWindowSchema.optional(),
   siblingUrl: z.string().url().refine((value) => {
     const url = new URL(value);
     return url.protocol === 'https:' && !url.username && !url.password && !url.hostname.endsWith('.invalid');

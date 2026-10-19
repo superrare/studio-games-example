@@ -20,7 +20,7 @@
     "test": "tsx --test tests/*.test.ts"
   },
   "dependencies": {
-    "@rareprotocol/connect": "0.10.0",
+    "@rareprotocol/connect": "0.11.0",
     "zod": "4.3.6"
   },
   "devDependencies": {

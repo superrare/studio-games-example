@@ -60,11 +60,12 @@ function recoveryMessage(error) {
 }
 
 export class PaidRound {
-  /** @param {{ game: any, scoringGame: any, variant: string, root: HTMLElement | null, getBalance: () => any, getAddress: () => string | undefined, storageKey: string, onPlayRequested?: (terms: { credits: number }) => void, onComplete?: (score: number) => void }} options */
-  constructor({ game, scoringGame, variant, root, getBalance, getAddress, storageKey, onPlayRequested, onComplete }) {
+  /** @param {{ game: any, scoringGame: any, variant: string, leaderboardWindow?: { from: string, to: string }, root: HTMLElement | null, getBalance: () => any, getAddress: () => string | undefined, storageKey: string, onPlayRequested?: (terms: { credits: number }) => void, onComplete?: (score: number) => void }} options */
+  constructor({ game, scoringGame, variant, leaderboardWindow, root, getBalance, getAddress, storageKey, onPlayRequested, onComplete }) {
     this.game = game;
     this.scoringGame = scoringGame;
     this.variant = variant;
+    this.leaderboardWindow = leaderboardWindow;
     this.root = root;
     this.getBalance = getBalance;
     this.getAddress = getAddress;
@@ -105,6 +106,9 @@ export class PaidRound {
     this.root.append(this.statusNode);
     this.scoreNode = element('p', 'Score: 0', 'game-score');
     this.root.append(element('p', 'The platform runs this game’s bundled server verifier. Inputs are sent to the server; only its recorded result is a verified score.'));
+    document.querySelector('#leaderboard-window').textContent = this.leaderboardWindow
+      ? `Completed runs: [${this.leaderboardWindow.from}, ${this.leaderboardWindow.to}) · explicit UTC/offset times; start included, end excluded`
+      : 'All time';
     this.leaderboardStatus = document.querySelector('#leaderboard-status');
     this.leaderboardTable = document.querySelector('#leaderboard-table');
     this.leaderboardEntries = document.querySelector('#leaderboard-entries');
@@ -794,7 +798,9 @@ export class PaidRound {
     this.leaderboardTable.setAttribute('aria-busy', 'true');
     this.leaderboardStatus.textContent = 'Loading scores…';
     try {
-      const entries = await this.scoringGame.getServerLeaderboard();
+      const entries = await (this.leaderboardWindow
+        ? this.scoringGame.getServerLeaderboard(this.leaderboardWindow)
+        : this.scoringGame.getServerLeaderboard());
       if (generation !== this.leaderboardGeneration) return;
       const rows = entries.map((entry) => {
         const row = element('tr');

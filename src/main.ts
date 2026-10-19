@@ -170,6 +170,7 @@ async function main(): Promise<void> {
   const creditPanel = credits;
   round = new PaidRound({
     game, scoringGame, variant: configuration.game,
+    leaderboardWindow: configuration.leaderboardWindow,
     root: requiredElement('#game'), storageKey: `${storageKey}:round`,
     getBalance: async () => {
       await creditPanel.refresh();

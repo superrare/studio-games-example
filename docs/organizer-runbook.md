@@ -38,7 +38,7 @@ rare-profile --version
 rare-profile credit-group --help
 ```
 
-The example uses published **Connect 0.10.0** and stable **Rare Profile 0.1.0**. `pnpm install` resolves the pinned Connect release from npm, and the CLI command above installs its stable release. No beta tag, SDK checkout, local package archive, private registry, database credential or Privy application secret is needed.
+The example uses published **Connect 0.11.0** and stable **Rare Profile 0.1.0**. `pnpm install` resolves the pinned Connect release from npm, and the CLI command above installs its stable release. No beta tag, SDK checkout, local package archive, private registry, database credential or Privy application secret is needed.
 
 The SDK provides embedded or popup Connect, group credits, payment intents, explicit consent/recovery, server-run start and authoritative scoring reads. Scoring calls use each deployed game's own origin. Community leaderboards are not a substitute for server results. `game.connect()` authorizes through Studio's API after identity is established.
 
@@ -220,6 +220,15 @@ Credits spent do not imply an ETH revenue amount or distinguish paid from grante
 ### ENS leaderboard labels
 
 The games prefer a forward-verified `player.ensName` for wallet scorers while retaining the full wallet address as a tooltip. Studio resolves Ethereum-mainnet ENS through its server-only `ALCHEMY_API_KEY`; no browser secret or player signature is needed. Missing names/configuration, failed lookups and deadlines preserve wallet labels and scores. Names do not change identity, ranking or prize eligibility.
+
+### Explicit leaderboard display windows
+
+Both games default to **All time**. To show a deliberately bounded top ten, add `"leaderboardWindow": { "from": "2026-10-19T00:00:00Z", "to": "2026-10-26T00:00:00Z" }` to that game's public configuration, replacing these illustrative dates with the intended interval. UTC `Z` or explicit offsets (for example `2026-10-19T00:00:00-04:00`) are required on both real calendar timestamps. Malformed or incomplete timestamps reject configuration; Studio checks `from < to` at database precision and rejects invalid ranges rather than silently showing all-time.
+
+Connect 0.11.0's `game.getServerLeaderboard({ from, to })` performs a public server read. Studio selects database-owned completed-run `ended_at` in **`[from,to)`**, lower inclusive and upper exclusive, before best-per-identity and top-ten selection. The UI displays the same exact declared interval and timezone offsets; it does not filter an all-time top ten locally. Omitting the field preserves `game.getServerLeaderboard()` and **All time**. There is no score reset, browser-clock week inference or automatic rollover; sample configs deliberately have no fixed week.
+
+This is a display/read window across the app's completed events/builds, not an event ID filter, admission rule, full prize ledger or eligibility decision. It does not change the all-time top-score helper, usage-report capture timestamps, manual payouts or anti-bot limitations. Choose event bounds and contest rules separately. Config is bundled: changing it requires rebuilding/redeploying the same app and following section 6's matching verifier/version/event publication process, without changing the approved game origin.
+
 
 ## 5. Build and update the same two apps
 
@@ -476,7 +485,7 @@ Do not clear browser storage while recovering a payment/start. A different app o
 
 ### Safe unpaid smoke
 
-- [ ] Clone and install from the supplied Connect/CLI archives; do not rely on an unpublished npm release or SDK checkout.
+- [ ] Clone the example and install pinned Connect 0.11.0 from npm and stable Rare Profile 0.1.0; no SDK checkout or private package archive is required.
 - [ ] Confirm both ZIPs contain root client/config/verifier/scoring artifacts and different game variants.
 - [ ] Check app IDs/origins against CLI deployment responses; confirm both approved registrations cost `1` credit in the same group.
 - [ ] Inspect the group's immutable chain, currency/token, treasury, pack terms, purchase pause and new-use pause before enabling the purchase UI.

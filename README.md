@@ -31,7 +31,7 @@ pnpm install
 npm install --global @rareprotocol/rare-profile@0.1.0
 ```
 
-The example pins published **Connect 0.10.0** in its lockfile. The CLI command above installs stable **Rare Profile 0.1.0**; no beta tag, SDK checkout, local package archive, private registry or Privy application secret is needed.
+The example pins published **Connect 0.11.0** in `package.json`. The CLI command above installs stable **Rare Profile 0.1.0**; no beta tag, SDK checkout, local package archive, private registry or Privy application secret is needed.
 
 ### Configure and build
 
@@ -53,6 +53,19 @@ A per-game public configuration has this shape:
 ```
 
 For the second game, set `game` to `color-match`, use its different `appId` and `appOrigin`, and keep the same `groupId`. Optional `siblingUrl` links to the other game's HTTPS page. Never put a treasury override, wallet key, creator token, session credential or service secret in this config: payment terms come from Studio's authoritative quote.
+
+Both games default to an **All time** top-ten leaderboard. An organizer can deliberately add an optional public config field for a fixed interval, for example:
+
+```json
+"leaderboardWindow": {
+  "from": "2026-10-19T00:00:00Z",
+  "to": "2026-10-26T00:00:00Z"
+}
+```
+
+These are illustrative dates, not a preset contest or an automatically current week. Choose your own bounds; both must be real ISO calendar timestamps with `Z` (UTC) or an explicit offset, and `from` must be earlier than `to`. Malformed or incomplete timestamps reject configuration. Studio validates ordering at database precision and rejects invalid ranges; an error never falls back to all-time. The games call `getServerLeaderboard({ from, to })` and display the same exact interval/timezones. Studio filters database-owned completed-run `ended_at` in **`[from,to)`** (start included, end excluded) before selecting each identity's best result and the top ten. No browser-clock week calculation, local filtering of all-time leaders, score reset or automatic rollover occurs. Remove the field for the compatible no-argument all-time read. Sample config files intentionally omit it.
+
+Changing this bundled public configuration requires a source rebuild/redeploy and the existing [deployment-pinned verifier/event process](docs/organizer-runbook.md#6-publish-a-verifier-version-and-scoring-event); changing leaderboard display bounds neither updates scoring-event admission bounds nor establishes prize eligibility.
 
 ```sh
 pnpm build -- --config ./target-rush.config.json --output ./dist/target-rush.zip
@@ -86,7 +99,7 @@ Local HTTP is for development, not paid-flow acceptance: Studio registers exact 
 
 - The published Connect SDK provides embedded Connect (the default) or a configured popup, scoped group credits, payment intents, explicit paid-start consent/recovery, server-run start and authoritative scoring reads. If embed is unavailable, the app exposes an explicit popup fallback; it never opens a popup silently. `game.connect()` authorizes through the Studio API without another hosted flow.
 - The player shell has one Play entry point, local Practice with no paid-start or score submission calls, a wallet menu with purchase history/recovery, and separate server-verified versus unrecorded practice results. A Play after sign-in or checkout requires fresh spend consent.
-- The example calls the SDK's `getActiveScoringEvent()` and `getServerLeaderboard()` on the deployed game's own origin. Its server-run client uses that origin too, so WebSocket tickets are used on the correct host. Credit operations use canonical Studio. No copied scoring HTTP client is required.
+- The example calls the SDK's `getActiveScoringEvent()` and `getServerLeaderboard()` (with explicit bounds when `leaderboardWindow` is configured) on the deployed game's own origin. Its server-run client uses that origin too, so WebSocket tickets are used on the correct host. Credit operations use canonical Studio. No copied scoring HTTP client is required.
 - Saved purchase, consent, paid-start, server-run and completion records are recovery evidence, not permission to initiate another payment or charge. Preserve original keys after uncertain outcomes and keep records scoped to wallet, group, app and origin. Legacy USDC recovery records migrate losslessly to the currency-aware storage version.
 - A fresh account starts with zero purchased credits. No seeded credits, automatic grants, free paid-start fallback or automated prize payouts are included.
 - The group operator can explicitly allocate credits using `rare-profile credit-group grant`; see the [operator allocation workflow](docs/organizer-runbook.md#operator-credit-allocations). Allocations need no payment but use the same shared balance and normal per-play consent. The player app cannot allocate credits.
@@ -97,7 +110,7 @@ Local HTTP is for development, not paid-flow acceptance: Studio registers exact 
 
 Update the **same apps** after bootstrap rather than allocating replacement identities. Every scoring deployment needs its root verifier, matching verifier version and an event pinned to that deployment. Group membership survives an update; scoring readiness does not automatically migrate. See the [runbook's publishing and update steps](docs/organizer-runbook.md#6-publish-a-verifier-version-and-scoring-event).
 
-The public top score spans completed events/builds for an app. It is not an event standings table, weekly winner list, combined-game ranking or prize calculator. Organizers must establish contest windows, eligibility, tie-breaking, result review, prize funding and fulfillment separately.
+The public top score remains an all-time maximum across completed events/builds for an app. The separate top-ten leaderboard supports an explicit completion-time window, but is not an event-specific standings table, complete eligible entrant ledger, combined-game ranking or prize calculator. Organizers must establish contest windows, eligibility, tie-breaking, result review, prize funding and fulfillment separately.
 
 ## Live integration check — 2026-10-15
 
@@ -113,6 +126,10 @@ The original 0.8.0 deployment check predates the current source. It does not ver
 ## Published-package verification
 
 Release verification with **Connect 0.10.0** and stable **Rare Profile 0.1.0** covered a frozen dependency install, typechecking, all 13 tests, both game ZIP builds, real production ENS labels in a local browser, local Practice and an authenticated CLI usage report. No live purchase, credit grant or paid round was performed for this release. Local browser checks do not replace acceptance on each registered HTTPS game origin.
+
+Connect **0.11.0** verification covered a frozen install from npm, typechecking, all **14 tests**, and both game ZIP builds. A fresh Node process using the published dependency passed production all-time, historical-week, current-week, microsecond-window, invalid-range and public CORS/no-store checks; the registry tarball integrity matched the tested release artifact.
+
+Local browser checks covered both variants' all-time and explicit-window empty states, matching request bounds and labels, a visible server-rejected invalid range, a narrow layout without horizontal overflow, refresh, and both free Practice modes scoring locally without any POST request. A temporary GET-only relay forwarded public scoring reads to the real deployed API; the ordinary local preview still does not proxy Studio APIs. Pixel capture was unavailable: browser screenshots timed out and native capture was blocked by macOS Accessibility permissions. No live game redeployment, purchase, credit grant or paid round was performed; registered-origin paid acceptance remains a separate step.
 
 ## License
 
