@@ -52,7 +52,7 @@ rare-profile whoami
 rare-profile store list --json
 ```
 
-The CLI manages creator deployment, commerce terms and explicit operator credit allocations. These actions use the existing creator `apps` scope/session and never move money or access a player wallet. Keep `~/.rare-profile/config.json` private; it is not a player Connect session, wallet key or permission to spend ETH/USDC. Do not infer that a locally supplied beta archive is already published to npm.
+The CLI manages creator deployment, commerce terms and explicit operator credit allocations. These actions use the existing creator `apps` scope/session and never move money or access a player wallet. Keep `~/.rare-profile/config.json` private; it is not a player Connect session, wallet key or permission to spend ETH/USDC.
 
 ### Authenticate and choose the existing storefront
 
