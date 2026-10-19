@@ -46,6 +46,19 @@ test('configuration accepts embedded and popup Connect and rejects invalid origi
   assert.equal(parseConfiguration(valid, 'http://127.0.0.1:4173').appOrigin, valid.appOrigin);
 });
 
+test('leaderboard windows reject partial, malformed and ambiguous configuration instead of falling back to all-time', () => {
+  for (const leaderboardWindow of [
+    null,
+    { from: '2026-10-19T00:00:00Z' },
+    { to: '2026-10-26T00:00:00Z' },
+    { from: '2026-10-19T00:00:00', to: '2026-10-26T00:00:00Z' },
+    { from: '2026-02-29T00:00:00Z', to: '2026-03-02T00:00:00Z' },
+    { from: '2026-10-19T00:00:00Z', to: '2026-10-26T00:00:00Z', reset: true },
+  ]) {
+    assert.throws(() => parseConfiguration({ ...valid, leaderboardWindow }));
+  }
+});
+
 test('unreadable purchase evidence blocks replacement quotes without deleting the stored record', async () => {
   const original = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
   const evidence = '{broken payment evidence';
