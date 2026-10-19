@@ -33,12 +33,12 @@ corepack prepare pnpm@10.11.0 --activate
 git clone https://github.com/superrare/studio-games-example.git
 cd studio-games-example
 pnpm install
-npm install --global @rareprotocol/rare-profile@0.1.0-beta.7
+npm install --global @rareprotocol/rare-profile@0.1.0
 rare-profile --version
 rare-profile credit-group --help
 ```
 
-The example uses published **Connect 0.10.0** and **Rare Profile 0.1.0-beta.7**. `pnpm install` resolves the pinned Connect release from npm, and the CLI command above installs its published release. No SDK checkout, local package archive, private registry, database credential or Privy application secret is needed.
+The example uses published **Connect 0.10.0** and stable **Rare Profile 0.1.0**. `pnpm install` resolves the pinned Connect release from npm, and the CLI command above installs its stable release. No beta tag, SDK checkout, local package archive, private registry, database credential or Privy application secret is needed.
 
 The SDK provides embedded or popup Connect, group credits, payment intents, explicit consent/recovery, server-run start and authoritative scoring reads. Scoring calls use each deployed game's own origin. Community leaderboards are not a substitute for server results. `game.connect()` authorizes through Studio's API after identity is established.
 

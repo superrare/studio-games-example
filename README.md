@@ -19,7 +19,7 @@ For game implementation and prize integrity, read the [server-verification guide
 ### Requirements
 
 - Node.js **22 or newer**, Git, and pnpm **10.11.0** (the repository's declared package manager).
-- A Studio creator account and the published `rare-profile` CLI **0.1.0-beta.7 or newer** for deployment.
+- A Studio creator account and the stable `rare-profile` CLI **0.1.0 or newer** for deployment.
 - For an explicitly approved paid check only: a wallet with the configured ETH or USDC asset and sufficient gas, and a treasury the organizer controls.
 
 ```sh
@@ -28,10 +28,10 @@ cd studio-games-example
 corepack enable
 corepack prepare pnpm@10.11.0 --activate
 pnpm install
-npm install --global @rareprotocol/rare-profile@0.1.0-beta.7
+npm install --global @rareprotocol/rare-profile@0.1.0
 ```
 
-The example pins published **Connect 0.10.0** in its lockfile. The CLI command above installs published **Rare Profile 0.1.0-beta.7**; no SDK checkout, local package archive, private registry or Privy application secret is needed.
+The example pins published **Connect 0.10.0** in its lockfile. The CLI command above installs stable **Rare Profile 0.1.0**; no beta tag, SDK checkout, local package archive, private registry or Privy application secret is needed.
 
 ### Configure and build
 
