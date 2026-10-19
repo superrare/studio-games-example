@@ -3,46 +3,51 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="Two server-verified Studio credit games using the published SuperRare Connect SDK.">
-    <title>Studio games · Real shared credits</title>
+    <meta name="description" content="Two server-verified Studio credit games using SuperRare Connect.">
+    <title>Studio games · Player</title>
     <link rel="stylesheet" href="./assets/styles.css">
   </head>
   <body>
     <main>
+      <header class="player-bar">
+        <a class="brand" href="/">Studio games</a>
+        <div class="player-actions">
+          <button id="balance-menu" class="secondary" type="button">Credits</button>
+          <button id="wallet-menu" class="secondary" type="button">Wallet</button>
+        </div>
+      </header>
       <p class="eyebrow">SuperRare Connect · Studio game example</p>
       <h1>Studio games</h1>
       <p class="lede">Loading organizer configuration…</p>
-      <p class="payment-notice"><strong>Ethereum mainnet · real USDC, not demo money.</strong> $0.01 USDC buys 10 credits; each play uses 1 credit. Network fees may apply. Both games use your shared group balance. Organizer prizes are handled manually.</p>
+      <p class="payment-notice"><strong>Paid plays use real funds.</strong> Review the current quote and wallet details before confirming any purchase. Network fees may apply. Both games use your shared group balance.</p>
       <nav aria-label="Other game"><a id="sibling-game" hidden></a></nav>
-      <section class="layout" aria-label="Game and account">
-        <section class="card game-card" id="game" aria-label="Paid game"></section>
-        <aside class="card account-card">
-          <h2>Your shared credits</h2>
-          <section id="credits" aria-label="Credit balance and purchases"></section>
-          <div class="connection">
-            <button id="sign-in" class="secondary" type="button" disabled>Checking Connect sign-in…</button>
-            <p id="connect-status" role="status" aria-live="polite">Checking the saved SuperRare Connect session…</p>
-            <button id="sign-out" class="secondary" type="button" hidden>Sign out / switch wallet</button>
-            <button id="connect" class="secondary" type="button" hidden>Retry game authorization</button>
-            <p id="connection-status" role="status" aria-live="polite">Sign in to SuperRare to connect this game and load credits.</p>
-          </div>
-          <p class="fine-print">Authentication, game authorization, payment confirmation, and Play are separate approvals. Reloading or visiting the other game never starts a purchase or paid play. Purchases need hosted wallet approval.</p>
-        </aside>
+      <section class="card player-card" aria-label="Game">
+        <div class="player-heading"><div><p class="eyebrow">Server-verified game</p><h2 id="game-title">Game</h2></div><span id="balance-badge">— credits</span></div>
+        <section id="game" aria-label="Paid game"></section>
+        <div class="primary-actions">
+          <button id="play" type="button" disabled>Play</button>
+          <button id="practice" class="secondary" type="button">Free practice · unrecorded</button>
+        </div>
+        <p id="play-status" role="status" aria-live="polite">Loading…</p>
+        <section id="practice-game" hidden aria-label="Practice game"></section>
+        <section id="run-result" class="run-result" aria-live="polite" hidden></section>
       </section>
       <details class="developer"><summary>Integration details</summary><p id="configuration"></p><p>The ZIP includes a server-verifier.js worker. Studio’s Workers for Platforms runtime validates ordered inputs, advances server-owned time, and records the verifier’s final score. The browser never submits a claimed score.</p></details>
       <section class="card high-scores" aria-labelledby="high-scores-title">
-        <div class="high-scores-header">
-          <h2 id="high-scores-title">Top 10 scorers</h2>
-          <button id="refresh-leaderboard" class="secondary" type="button">Refresh scores</button>
-        </div>
+        <div class="high-scores-header"><h2 id="high-scores-title">Top 10 scorers</h2><button id="refresh-leaderboard" class="secondary" type="button">Refresh scores</button></div>
         <p class="fine-print">Each scorer’s best server-verified score · All time</p>
         <p id="leaderboard-status" role="status" aria-live="polite">Loading scores…</p>
-        <table id="leaderboard-table" aria-labelledby="high-scores-title" hidden>
-          <thead><tr><th scope="col">Rank</th><th scope="col">Scorer</th><th scope="col">Score</th></tr></thead>
-          <tbody id="leaderboard-entries"></tbody>
-        </table>
+        <table id="leaderboard-table" aria-labelledby="high-scores-title" hidden><thead><tr><th scope="col">Rank</th><th scope="col">Scorer</th><th scope="col">Score</th></tr></thead><tbody id="leaderboard-entries"></tbody></table>
       </section>
     </main>
+    <dialog id="wallet-panel" class="modal">
+      <form method="dialog" class="modal-close"><button class="secondary" aria-label="Close wallet">Close</button></form>
+      <h2>Wallet</h2><p id="wallet-address">Not signed in</p>
+      <div class="connection"><button id="sign-in" class="secondary" type="button">Sign in to SuperRare</button><button id="sign-out" class="secondary" type="button" hidden>Sign out / switch wallet</button><p id="connect-status" role="status" aria-live="polite"></p><button id="connect" class="secondary" type="button" hidden>Authorize this game</button><p id="connection-status" role="status" aria-live="polite"></p></div>
+      <h3>Your shared credits and purchases</h3><section id="credits" aria-label="Credit balance and purchases"></section>
+      <p class="fine-print">Authentication, game authorization, payment confirmation, and Play are separate approvals. Opening this menu never starts a purchase or paid play.</p>
+    </dialog>
+    <dialog id="connect-modal" class="modal connect-modal"><button id="connect-close" class="secondary" type="button">Close Connect</button><p id="connect-modal-status" role="status" aria-live="polite"></p><div id="connect-embed"></div></dialog>
     <script type="module" src="./assets/app.js"></script>
   </body>
 </html>

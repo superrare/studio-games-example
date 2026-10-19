@@ -1,40 +1,44 @@
 // Adapted from @rareprotocol/connect examples/target-game (MIT, Copyright 2026 SuperRare).
 import type {
-  ConnectIntentCreation, SuperRareGameClient, SuperRareConnectClient,
+  ConnectIntentCreation, SuperRareGameClient, SuperRareConnectClient, ConnectTransferChainId,
   GameCreditPurchase, GameCreditBalance, ConnectIntent,
 } from '@rareprotocol/connect';
 import { describeSdkFailure } from './hosted-flow.js';
 import { z } from 'zod';
 const purchaseRecordSchema = z.object({
   purchase: z.object({
-    id: z.string(),
-    accountId: z.string(),
-    paymentConfigId: z.string(),
-    chainId: z.number(),
-    address: z.string(),
-    treasuryAddress: z.string(),
-    usdcAddress: z.string(),
-    packPriceAtomic: z.string(),
-    packCredits: z.number(),
-    minBlock: z.string(),
-    createdAt: z.string(),
-    expiresAt: z.string(),
-    transactionHash: z.string().nullable(),
+    id: z.string(), accountId: z.string(), paymentConfigId: z.string(), chainId: z.number(),
+    address: z.string(), treasuryAddress: z.string(), currency: z.enum(['ETH', 'USDC']),
+    tokenAddress: z.string().nullable(), packPriceAtomic: z.string(), packCredits: z.number(),
+    minBlock: z.string(), createdAt: z.string(), expiresAt: z.string(),
+    transactionHash: z.string().nullable(), creditedAt: z.string().nullable(),
+  }).passthrough(),
+  confirmPayment: z.boolean().optional(), outcomeUnknown: z.boolean().optional(),
+  intentId: z.string().optional(), intentStatus: z.string().optional(),
+  transactionHash: z.string().optional(), credited: z.boolean().optional(),
+}).passthrough();
+const legacyPurchaseRecordSchema = z.object({
+  purchase: z.object({
+    id: z.string(), accountId: z.string(), paymentConfigId: z.string(), chainId: z.number(),
+    address: z.string(), treasuryAddress: z.string(), usdcAddress: z.string(),
+    packPriceAtomic: z.string(), packCredits: z.number(), minBlock: z.string(),
+    createdAt: z.string(), expiresAt: z.string(), transactionHash: z.string().nullable(),
     creditedAt: z.string().nullable(),
   }).passthrough(),
-  confirmPayment: z.boolean().optional(),
-  outcomeUnknown: z.boolean().optional(),
-  intentId: z.string().optional(),
-  intentStatus: z.string().optional(),
-  transactionHash: z.string().optional(),
-  credited: z.boolean().optional(),
+  confirmPayment: z.boolean().optional(), outcomeUnknown: z.boolean().optional(),
+  intentId: z.string().optional(), intentStatus: z.string().optional(),
+  transactionHash: z.string().optional(), credited: z.boolean().optional(),
 }).passthrough();
 const archivedPurchasesSchema = z.array(z.object({
   record: purchaseRecordSchema,
   archivedAt: z.string(),
 }));
-const MAINNET_USDC = '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48';
-const STORAGE_VERSION = 'v1';
+const legacyArchivedPurchasesSchema = z.array(z.object({
+  record: legacyPurchaseRecordSchema,
+  archivedAt: z.string(),
+}));
+const STORAGE_VERSION = 'v2';
+const LEGACY_STORAGE_VERSION = 'v1';
 type PurchaseRecord = {
   purchase: GameCreditPurchase;
   confirmPayment?: boolean;
@@ -52,18 +56,46 @@ type CreditConfiguration = {
   changed?: () => void;
 };
 type ActionButton = (label: string, action: () => void | Promise<void>, className?: string) => HTMLButtonElement;
+function migrateLegacyPurchaseRecord(value: unknown): PurchaseRecord {
+  const legacy = legacyPurchaseRecordSchema.parse(value);
+  const { usdcAddress, ...purchase } = legacy.purchase;
+  return purchaseRecordSchema.parse({
+    ...legacy,
+    purchase: { ...purchase, currency: 'USDC', tokenAddress: usdcAddress },
+  });
+}
+
+function formatPrice(atomic: string, currency: GameCreditPurchase['currency']): string {
+  if (typeof atomic !== 'string' || atomic.length > 78 || !/^\d+$/.test(atomic)) return 'an amount shown by the wallet';
+  const decimals = currency === 'ETH' ? 18 : 6;
+  const scale = 10n ** BigInt(decimals);
+  const value = BigInt(atomic);
+  const whole = value / scale;
+  const fraction = String(value % scale).padStart(decimals, '0').replace(/0+$/, '');
+  const amount = `${whole}${fraction ? `.${fraction}` : ''}`;
+  return currency === 'USDC' ? `$${amount} USDC` : `${amount} ETH`;
+}
+const SUPPORTED_CHAINS: Record<number, true> = { 1: true, 11155111: true, 8453: true, 84532: true };
+
+function isPaymentQuoteValid(quote: GameCreditPurchase): boolean {
+  return Number.isSafeInteger(quote.chainId)
+    && SUPPORTED_CHAINS[quote.chainId] === true
+    && /^0x[0-9a-fA-F]{40}$/.test(quote.address)
+    && /^0x[0-9a-fA-F]{40}$/.test(quote.treasuryAddress)
+    && quote.packPriceAtomic.length <= 78
+    && /^[1-9]\d*$/.test(quote.packPriceAtomic)
+    && BigInt(quote.packPriceAtomic) > 0n
+    && Number.isSafeInteger(quote.packCredits)
+    && quote.packCredits > 0
+    && (quote.currency === 'ETH'
+      ? quote.tokenAddress === null
+      : typeof quote.tokenAddress === 'string' && /^0x[0-9a-fA-F]{40}$/.test(quote.tokenAddress));
+}
 
 function text(element: HTMLElement, value: string): void {
   element.textContent = value;
 }
 
-function formatPrice(atomic: string): string {
-  if (!/^\d+$/.test(String(atomic))) return 'an amount shown by the wallet';
-  const value = BigInt(atomic);
-  const whole = value / 1_000_000n;
-  const fraction = String(value % 1_000_000n).padStart(6, '0').replace(/0+$/, '');
-  return `$${whole}${fraction ? `.${fraction}` : ''} USDC`;
-}
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'An unexpected error occurred.';
@@ -143,11 +175,33 @@ export class Credits {
   _stateKey(address: string | undefined): string {
     return `${this.storageKey}:${STORAGE_VERSION}:${address}`;
   }
+  _legacyStateKey(address: string): string {
+    return `${this.storageKey}:${LEGACY_STORAGE_VERSION}:${address}`;
+  }
+  _legacyMigrationKey(address: string): string {
+    return `${this._legacyStateKey(address)}:migrated-v2`;
+  }
 
   _loadRecord(address: string): PurchaseRecord | undefined {
     try {
-      const serialized = localStorage.getItem(this._stateKey(address));
-      const record = serialized === null ? undefined : purchaseRecordSchema.parse(JSON.parse(serialized));
+      const current = localStorage.getItem(this._stateKey(address));
+      if (current !== null) {
+        const record = purchaseRecordSchema.parse(JSON.parse(current));
+        this.recoveryBlocked = false;
+        return record;
+      }
+      if (localStorage.getItem(this._legacyMigrationKey(address)) === '1') {
+        this.recoveryBlocked = false;
+        return undefined;
+      }
+      const legacy = localStorage.getItem(this._legacyStateKey(address));
+      if (legacy === null) {
+        this.recoveryBlocked = false;
+        return undefined;
+      }
+      const record = migrateLegacyPurchaseRecord(JSON.parse(legacy));
+      localStorage.setItem(this._stateKey(address), JSON.stringify(record));
+      localStorage.setItem(this._legacyMigrationKey(address), '1');
       this.recoveryBlocked = false;
       return record;
     } catch {
@@ -182,7 +236,10 @@ export class Credits {
     }
     const purchase = this.record.purchase;
     text(this.detailsText, [
-      `Purchase ID: ${purchase.id}`,
+      `Payment: ${formatPrice(purchase.packPriceAtomic, purchase.currency)} · ${purchase.currency} · chain ${purchase.chainId}`,
+      `Recipient: ${purchase.treasuryAddress}`,
+      purchase.tokenAddress ? `Token: ${purchase.tokenAddress}` : '',
+      `Credits: ${purchase.packCredits}`,
       `Quote expires: ${purchase.expiresAt}`,
       this.record.intentId ? `Connect intent: ${this.record.intentId}` : '',
       this.record.transactionHash ? `Transaction: ${this.record.transactionHash}` : '',
@@ -195,12 +252,31 @@ export class Credits {
     }
   }
 
+  _historyKey(address: string): string {
+    return `${this._stateKey(address)}:history`;
+  }
+
+  _loadArchivedPurchases(address: string): z.infer<typeof archivedPurchasesSchema> {
+    const currentKey = this._historyKey(address);
+    const current = localStorage.getItem(currentKey);
+    if (current !== null) return archivedPurchasesSchema.parse(JSON.parse(current));
+    const migrationKey = `${this._legacyStateKey(address)}:history:migrated-v2`;
+    if (localStorage.getItem(migrationKey) === '1') return [];
+    const legacyKey = `${this._legacyStateKey(address)}:history`;
+    const legacy = localStorage.getItem(legacyKey);
+    if (legacy === null) return [];
+    const migrated = legacyArchivedPurchasesSchema.parse(JSON.parse(legacy)).map(({ record, archivedAt }) => ({
+      record: migrateLegacyPurchaseRecord(record), archivedAt,
+    }));
+    localStorage.setItem(currentKey, JSON.stringify(migrated));
+    localStorage.setItem(migrationKey, '1');
+    return archivedPurchasesSchema.parse(migrated);
+  }
+
   _showArchivedPurchases(): void {
     if (!this.accountAddress) return;
     try {
-      const serialized = localStorage.getItem(`${this._stateKey(this.accountAddress)}:history`);
-      if (serialized === null) return;
-      const history = archivedPurchasesSchema.parse(JSON.parse(serialized));
+      const history = this._loadArchivedPurchases(this.accountAddress);
       history.forEach(({ record }, index) => {
         this._addButton(
           this.recoveryActions,
@@ -209,17 +285,15 @@ export class Credits {
         );
       });
     } catch {
-      this._say('Saved advanced recovery records could not be read; the current purchase is unchanged.');
+      this._say('Saved advanced recovery records could not be read or migrated; the original evidence remains unchanged.');
     }
   }
 
   _restoreArchivedPurchase(index: number): void {
     if (this.recoveryBlocked || !this.accountAddress || this.busy) return;
-    const historyKey = `${this._stateKey(this.accountAddress)}:history`;
+    const historyKey = this._historyKey(this.accountAddress);
     try {
-      const serialized = localStorage.getItem(historyKey);
-      if (serialized === null) return;
-      const history = archivedPurchasesSchema.parse(JSON.parse(serialized));
+      const history = this._loadArchivedPurchases(this.accountAddress);
       const selected = history[index];
       if (!selected) return;
       const current = this.record;
@@ -285,7 +359,7 @@ export class Credits {
     }
 
     if (record.confirmPayment) {
-      addButton(`Confirm ${record.purchase.packCredits} credits · ${formatPrice(record.purchase.packPriceAtomic)}`, () => this._pay(), 'primary');
+      addButton(`Confirm ${record.purchase.packCredits} credits · ${formatPrice(record.purchase.packPriceAtomic, record.purchase.currency)}`, () => this._pay(), 'primary');
       addButton('Cancel quote', () => this._discardQuote());
       return;
     }
@@ -367,20 +441,14 @@ export class Credits {
       const quote = await this.game.credits.createPurchase();
       const authorization = this._authorization();
       if (!authorization) throw new Error('Connect a game wallet before buying credits.');
-      if (quote.chainId !== 1) throw new Error('This example only accepts Ethereum mainnet credit quotes.');
-      if (quote.packPriceAtomic !== '10000' || quote.packCredits !== 10) {
-        throw new Error('This example requires $0.01 USDC for 10 credits. Ask the organizer to correct the payment configuration.');
-      }
-      if (quote.usdcAddress.toLowerCase() !== MAINNET_USDC) {
-        throw new Error('The credit quote does not use the configured Ethereum mainnet USDC contract. No payment was started.');
-      }
+      if (!isPaymentQuoteValid(quote)) throw new Error('The quote has unsupported terms or currency. No payment was started.');
       if (quote.address.toLowerCase() !== authorization.address) {
         throw new Error('This quote belongs to a different wallet. Refresh your game connection and try again.');
       }
       this.accountAddress = authorization.address;
       const record = { purchase: quote, confirmPayment: true, outcomeUnknown: false };
       this._saveRecord(record);
-      this._say(`Review the quote, then explicitly confirm ${quote.packCredits} credits for ${formatPrice(quote.packPriceAtomic)}.`);
+      this._say(`Review ${record.purchase.packCredits} credits for ${formatPrice(quote.packPriceAtomic, quote.currency)} · chain ${quote.chainId} · recipient ${quote.treasuryAddress}${quote.tokenAddress ? ` · token ${quote.tokenAddress}` : ''}.`);
     } catch (error) {
       this._say(`Could not create a safe purchase quote: ${errorMessage(error)} You can try again.`);
     } finally {
@@ -396,9 +464,8 @@ export class Credits {
       'Start over and request a fresh quote? This will not cancel any wallet transaction already submitted. Keep the old transaction details if payment may have completed.',
     )) return;
     try {
-      const historyKey = `${this._stateKey(this.accountAddress)}:history`;
-      const serializedHistory = localStorage.getItem(historyKey);
-      const history = serializedHistory === null ? [] : archivedPurchasesSchema.parse(JSON.parse(serializedHistory));
+      const historyKey = this._historyKey(this.accountAddress);
+      const history = this._loadArchivedPurchases(this.accountAddress);
       localStorage.setItem(historyKey, JSON.stringify([...history, { record, archivedAt: new Date().toISOString() }]));
       localStorage.removeItem(this._stateKey(this.accountAddress));
       this.record = undefined;
@@ -433,8 +500,8 @@ export class Credits {
       this._say('This quote expired before payment. Cancel it and request a fresh quote; no transfer was started.');
       return;
     }
-    if (quote.chainId !== 1 || quote.packPriceAtomic !== '10000' || quote.packCredits !== 10 || quote.usdcAddress.toLowerCase() !== MAINNET_USDC || quote.address.toLowerCase() !== authorization.address) {
-      this._say('This quote no longer matches the connected mainnet wallet. No payment was started.');
+    if (!isPaymentQuoteValid(quote) || quote.address.toLowerCase() !== authorization.address) {
+      this._say('This quote no longer matches its saved currency, chain or wallet. No payment was started.');
       return;
     }
     this.busy = true;
@@ -443,11 +510,11 @@ export class Credits {
       // Keep the exact quote and an ambiguous-outcome marker durable before the SDK opens hosted checkout.
       const pending = { ...record, confirmPayment: false, outcomeUnknown: true };
       this._saveRecord(pending);
-      this._say('Opening hosted wallet checkout in a popup. No transfer is submitted until the hosted wallet asks for explicit approval.');
+      this._say('Opening SuperRare Connect. No transfer is submitted until you explicitly approve it in your wallet.');
       const intent = await this.client.actions.transfer({
-        chainId: 1,
+        chainId: quote.chainId as ConnectTransferChainId,
         to: quote.treasuryAddress,
-        currency: 'USDC',
+        currency: quote.currency,
         amount: quote.packPriceAtomic,
         beforeOpen: (intent: ConnectIntentCreation) => this._saveRecord({
           ...pending,

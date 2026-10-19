@@ -60,13 +60,16 @@ function recoveryMessage(error) {
 }
 
 export class PaidRound {
-  constructor({ game, scoringGame, variant, root, getBalance, getAddress, storageKey }) {
+  /** @param {{ game: any, scoringGame: any, variant: string, root: HTMLElement | null, getBalance: () => any, getAddress: () => string | undefined, storageKey: string, onPlayRequested?: (terms: { credits: number }) => void, onComplete?: (score: number) => void }} options */
+  constructor({ game, scoringGame, variant, root, getBalance, getAddress, storageKey, onPlayRequested, onComplete }) {
     this.game = game;
     this.scoringGame = scoringGame;
     this.variant = variant;
     this.root = root;
     this.getBalance = getBalance;
     this.getAddress = getAddress;
+    this.onPlayRequested = onPlayRequested;
+    this.onComplete = onComplete;
     this.baseStorageKey = storageKey;
     this.state = null;
     this.storageKey = null;
@@ -238,7 +241,11 @@ export class PaidRound {
       const [terms] = await Promise.all([this.game.getTerms(), this.scoringGame.getActiveScoringEvent()]);
       if (terms.credits !== 1) throw new Error('This example requires exactly 1 credit per play. Ask the organizer to correct its terms.');
       if (generation !== this.playActionGeneration || this.storageKey !== accountKey || this.state !== previous) return;
-      this.button(`Play · ${terms.credits} credit${terms.credits === 1 ? '' : 's'}`, () => void this.prepareRound(terms.credits));
+      if (this.onPlayRequested) {
+        this.onPlayRequested(terms);
+      } else {
+        this.button(`Play · ${terms.credits} credit${terms.credits === 1 ? '' : 's'}`, () => void this.prepareRound(terms.credits));
+      }
     } catch (error) {
       if (generation !== this.playActionGeneration || this.storageKey !== accountKey || this.state !== previous) return;
       this.announce(`Could not load the game price: ${errorMessage(error)} No new play was started.`);
@@ -411,7 +418,11 @@ export class PaidRound {
       if (this.storageKey !== accountKey || this.state !== previous) return;
       if (terms.credits !== previous.request.expectedCredits) {
         this.announce(`The price changed to ${terms.credits} credits. Click Play to approve the new cost.`);
-        this.button(`Play · ${terms.credits} credit${terms.credits === 1 ? '' : 's'}`, () => void this.prepareRound(terms.credits));
+        if (this.onPlayRequested) {
+          this.onPlayRequested(terms);
+        } else {
+          this.button(`Play · ${terms.credits} credit${terms.credits === 1 ? '' : 's'}`, () => void this.prepareRound(terms.credits));
+        }
         this.button('Cancel', () => void this.refresh());
         return;
       }
@@ -764,6 +775,7 @@ export class PaidRound {
       this.arenaMessage.hidden = false;
       this.arenaMessage.textContent = `Round complete. Server-verified score: ${attempt.result.score}.`;
       this.announce(`Round complete. Server-verified score: ${attempt.result.score}.`);
+      this.onComplete?.(attempt.result.score);
       await this.getBalance();
       await this.showPlayAction();
       void this.refreshLeaderboard();
@@ -786,12 +798,16 @@ export class PaidRound {
       if (generation !== this.leaderboardGeneration) return;
       const rows = entries.map((entry) => {
         const row = element('tr');
-        const playerName = entry.player.displayName;
+        const playerName = entry.player.kind === 'wallet' && entry.player.ensName
+          ? entry.player.ensName
+          : entry.player.displayName;
         const label = entry.player.kind === 'wallet' && /^0x[0-9a-f]{40}$/i.test(playerName)
           ? `${playerName.slice(0, 6)}…${playerName.slice(-4)}`
           : playerName;
         const player = element('td', label);
-        player.title = playerName;
+        player.title = entry.player.kind === 'wallet'
+          ? entry.player.id ?? entry.player.displayName
+          : playerName;
         row.append(element('td', String(entry.rank)), player, element('td', entry.score));
         return row;
       });

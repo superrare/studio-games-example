@@ -2,7 +2,7 @@
 
 This guide publishes **Target Rush** and **Color Match** from [the public example](https://github.com/superrare/studio-games-example). It separates creator deployment permissions from the player's wallet approvals. No database access, service-role key, provisioning secret or Privy application secret belongs in an ordinary organizer's workflow or game bundle.
 
-The supported production payment setup here is **Ethereum mainnet only** (`chainId: 1`), canonical Ethereum USDC (`0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48`), **0.01 USDC for 10 credits**, and **1 credit per play**. USDC has six decimals, so the pack costs `10000` atomic units. Network fees are separate; 0.01 USDC is not a gas limit or total-cost guarantee.
+The group owner chooses the immutable group chain and configures either native **ETH** or a supported **USDC** token, plus the exact pack price and credits. ETH prices use wei (18 decimals); USDC prices use token atomic units (normally 6 decimals). Each quote snapshots currency, token, treasury, wallet, amount and timing; payment verification is based on that snapshot. The example charges **1 credit per play**. Network fees are separate. Never assume every group sells the same asset or price.
 
 Before adapting the game rules or accepting prize entries, read the [server-verification guide](server-verification.md). It explains the score-critical implementation, executable verifier checks, current automation/evidence limitations, and the manual review process. This runbook covers publishing and operation; passing verifier registration alone is not a security or fairness review.
 
@@ -25,7 +25,7 @@ An app can belong to multiple groups. This example explicitly selects one group;
 
 ## 2. Install the tools that actually contain the feature
 
-Use Node.js **22+** and pnpm **10.11.0** for this example. The CLI declares Node 20+, but using Node 22+ satisfies both projects. You also need Git and a ZIP utility for the small bootstrap below.
+Use Node.js **22+** and pnpm **10.11.0**. You also need Git and a ZIP utility for the small bootstrap below.
 
 ```sh
 corepack enable
@@ -33,27 +33,26 @@ corepack prepare pnpm@10.11.0 --activate
 git clone https://github.com/superrare/studio-games-example.git
 cd studio-games-example
 pnpm install
-```
-
-The repository pins the published **`@rareprotocol/connect@0.9.0-beta.0`** npm prerelease and its lockfile, not an unpublished SDK checkout. The SDK supplies popup sign-in, group credits, explicit consent/recovery, server-run start and public authoritative scoring reads. These examples call `getActiveScoringEvent()` and `getServerLeaderboard()` through a client pointed at the deployed game's own origin; community leaderboards are not a substitute for server results. Sign in with `auth.login()` before the API-only `game.connect()` authorization step. Native embedding is available in this beta but is deliberately not enabled in these popup examples.
-
-### Current rare-profile release reality
-
-The feature-enabled CLI reports **`0.1.0-beta.4`**. At the 2026-10-15 release check, npm `latest` and `beta` still pointed to beta.3. Do not assume `npm install -g @rareprotocol/rare-profile` supplies group commands. Until npm publishes the merged feature release, install from the public merged commit **`4a9edb3deb63b0941e34748561d39245ac41a74a`**:
-
-```sh
-git clone https://github.com/superrare/rare-profile.git /tmp/rare-profile-game-setup
-git -C /tmp/rare-profile-game-setup checkout --detach 4a9edb3deb63b0941e34748561d39245ac41a74a
-pnpm --dir /tmp/rare-profile-game-setup install --frozen-lockfile
-pnpm --dir /tmp/rare-profile-game-setup build
-(cd /tmp/rare-profile-game-setup && npm pack)
-npm install --global /tmp/rare-profile-game-setup/rareprotocol-rare-profile-0.1.0-beta.4.tgz
+npm install --global @rareprotocol/rare-profile@0.1.0-beta.7
 rare-profile --version
-rare-profile --help
 rare-profile credit-group --help
 ```
 
-Use an unused checkout directory if that path already exists. The source build is the installation workaround, not a requirement for a private package registry. `app deploy --help` is not reliable subcommand help in this CLI: it can run validation and report missing deployment flags. Use the exact commands below.
+The example uses published **Connect 0.10.0** and **Rare Profile 0.1.0-beta.7**. `pnpm install` resolves the pinned Connect release from npm, and the CLI command above installs its published release. No SDK checkout, local package archive, private registry, database credential or Privy application secret is needed.
+
+The SDK provides embedded or popup Connect, group credits, payment intents, explicit consent/recovery, server-run start and authoritative scoring reads. Scoring calls use each deployed game's own origin. Community leaderboards are not a substitute for server results. `game.connect()` authorizes through Studio's API after identity is established.
+
+### Creator CLI capabilities and credentials
+
+Authenticate using the intended creator's account:
+
+```sh
+rare-profile login
+rare-profile whoami
+rare-profile store list --json
+```
+
+The CLI manages creator deployment, commerce terms and explicit operator credit allocations. These actions use the existing creator `apps` scope/session and never move money or access a player wallet. Keep `~/.rare-profile/config.json` private; it is not a player Connect session, wallet key or permission to spend ETH/USDC. Do not infer that a locally supplied beta archive is already published to npm.
 
 ### Authenticate and choose the existing storefront
 
@@ -80,7 +79,7 @@ console.log(await storefrontResponse.json());
 
 Studio currently has one storefront per profile. `store create` does not guarantee a separate isolated test storefront. Inspect before changing anything, and use unmistakably test-only app titles: a bootstrap deployment can be publicly listed and can trigger launch notifications.
 
-The normal CLI credential file is `~/.rare-profile/config.json`, containing a personal access token and `baseUrl`. Keep it private. It is creator deployment access, **not** a player Connect session, wallet key or permission to spend USDC.
+The normal CLI credential file is `~/.rare-profile/config.json`, containing a personal access token and `baseUrl`. Keep it private. It is creator deployment access, **not** a player Connect session, wallet key or permission to spend ETH or USDC.
 
 ## 3. Allocate stable app identities with unpaid bootstraps
 
@@ -130,20 +129,20 @@ rare-profile credit-group create \
   --name "My two-game integration test credits" \
   --chain-id 1 \
   --treasury <your-controlled-ethereum-treasury> \
-  --usdc 0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48 \
-  --pack-price-atomic 10000 \
-  --pack-credits 10 \
+  --currency ETH \
+  --pack-price-atomic <price-in-wei> \
+  --pack-credits <credits-per-pack> \
   --json
 ```
 
-Record `data.group.id`. Inspect before attaching apps:
+For USDC instead, pass `--currency USDC --token-address <supported-mainnet-usdc-address>` and express `--pack-price-atomic` in token atomic units. Arbitrary ERC-20 payments are not supported. Record `data.group.id` and inspect the immutable chain, `currency`, `tokenAddress`, treasury, pack price/quantity, `purchasesPaused` and `newUsesPaused`:
 
 ```sh
 rare-profile credit-group get <group-id> --json
 rare-profile credit-group list --json
 ```
 
-Confirm chain `1`, canonical USDC, your treasury, `packPriceAtomic: "10000"`, `packCredits: 10`, `purchasesPaused` and `newUsesPaused`. New groups should show purchases unpaused; if using an existing group, do not assume the migration changed it.
+Choose your pack terms; no sample price is a recommendation or default.
 
 Register **only these isolated test apps** while their paid UI is being prepared:
 
@@ -165,9 +164,62 @@ rare-profile credit-group list --app <color-app-id> --json
 
 **Registration immediately changes access.** An approved registration on an active group gates ordinary unpaid game-session starts, even when purchases are paused. Do not register an existing live app before its paid-start flow works. HTTP localhost is not a permitted registration. Group owners can attach another creator's hosted app without an app-owner confirmation prompt; do not attach somebody else's app without explicit agreement. `list --app` can discover approved memberships beyond your own groups.
 
-### Payment-term changes still have an operational limitation
+### Safely changing payment terms
 
-Changing treasury, token, pack price or pack quantity creates a new immutable payment configuration and automatically pauses purchases. The group's chain is immutable. Existing balances and historical quotes are not reset. The public CLI currently has `create`, `list`, `get`, and `add-game`; it has **no purchase-unpause command**. An already paused group, including a group paused by a payment-term change, still needs a trusted Studio operator's recovery procedure after terms are checked. This is a self-service administration gap, **not organizer approval**, and it does not justify sharing database/service-role access with the organizer. `newUsesPaused` is separate from the purchase pause. Escalate a pause or ambiguous reservation to support with identifiers, not secrets; do not repeatedly create replacement groups.
+Changing currency, token, treasury, pack price or pack quantity creates a new immutable payment configuration and automatically pauses purchases. The group's chain, IDs, accounts and balances are preserved; older quotes remain claimable under their original terms. After checking the new terms, only the group owner can explicitly resume purchases:
+
+```sh
+rare-profile credit-group update <group-id> \
+  --currency ETH \
+  --treasury <your-controlled-ethereum-treasury> \
+  --pack-price-atomic <price-in-wei> \
+  --pack-credits <credits-per-pack>
+rare-profile credit-group get <group-id> --json
+rare-profile credit-group resume-purchases <group-id>
+```
+
+For USDC, include `--token-address <supported-token-address>`. `newUsesPaused` is independent of purchase pause. These creator commands change payment terms and availability only; they do not buy, grant or refund credits. Contact support about an unexpected state with identifiers, not secrets.
+
+### Operator credit allocations
+
+Once Studio migration `085_credit_group_operator_grants.sql` and its commerce handler are deployed, the authenticated group operator can allocate credits to a wallet without a payment:
+
+```sh
+rare-profile credit-group grant <group-id> \
+  --address <recipient-wallet-address> \
+  --credits 3 \
+  --idempotency-key campaign-wallet-001 \
+  --reason "Campaign allocation" \
+  --json
+```
+
+Review the recipient and quantity before running this mutation. Credits must be a whole number from 1 through 2147483647. Supply a reason of 1–500 characters after trimming, and an 8–128-character key matching `[A-Za-z0-9][A-Za-z0-9._:-]{7,127}`. Reuse the same key, wallet, quantity and reason after an uncertain response; identical retries return the same receipt without adding credits again. A changed payload with that key returns 409. Use a new key only for a deliberate new allocation.
+
+The server derives the operator from authentication and checks group ownership inside the allocation transaction. Other creators and player/game credentials cannot allocate; backend service credentials and database administrators remain trusted. The recipient account is resolved or created within that group and chain. The immutable receipt records the grant, account, recipient, operator, amount, reason, key and timestamp, not a mutable balance.
+
+Allocations increase the existing shared credit balance, require no ETH/USDC transfer, and do not check NFT ownership. Disabled groups reject allocation; purchase/new-use pauses remain unchanged. A grant does not bypass normal per-play consent or a spending pause. It is not a refund or credit-revocation feature. This manual operation is separate from local, unrecorded Practice.
+
+
+### Operator usage reports
+
+After Studio migration `086_credit_group_usage.sql` and the commerce reporting handler are deployed:
+
+```sh
+rare-profile credit-group usage <group-id> \
+  --from 2026-10-19T00:00:00Z \
+  --to 2026-10-26T00:00:00Z \
+  --limit 100 --json
+```
+
+Choose the timezone-qualified bounds deliberately; no local week is inferred. Only the current group operator can read the report. It counts immutable capture-ledger timestamps in `[from,to)`: charged plays and consumed credits by game, including currently suspended registrations and disabled groups. `completedPlays` means current completion status for those captured plays, not runs completed during the week. Uncharged reservations/cancellations and purchases/grants do not count; charged abandoned/expired plays still do.
+
+All counters are decimal strings. `totals` is the complete window, while `games` is one UUID-ordered page. If `page.hasMore`, repeat with the same range and `--after <page.nextCursor>`; pages are separate snapshots, not a frozen export. Limit is 1–100, default 100. The SDK method is `creditGroups.usage`.
+
+Credits spent do not imply an ETH revenue amount or distinguish paid from granted credits. Pool allocations and payouts remain organizer decisions. Never embed creator credentials in a public pool app; publish a deliberately public summary from a trusted operator process instead.
+
+### ENS leaderboard labels
+
+The games prefer a forward-verified `player.ensName` for wallet scorers while retaining the full wallet address as a tooltip. Studio resolves Ethereum-mainnet ENS through its server-only `ALCHEMY_API_KEY`; no browser secret or player signature is needed. Missing names/configuration, failed lookups and deadlines preserve wallet labels and scores. Names do not change identity, ranking or prize eligibility.
 
 ## 5. Build and update the same two apps
 
@@ -181,12 +233,12 @@ Make two local config files from `examples/target-rush.example.json` and `exampl
   "apiUrl": "https://api.superrare.com",
   "connectUrl": "https://connect.superrare.com",
   "appOrigin": "https://<target-app-hostname>",
-  "display": "popup",
+  "display": "embed",
   "game": "target-rush"
 }
 ```
 
-Use `game: "color-match"`, the Color Match app ID and its exact origin in the second file; use the **same group ID**. Optionally set `siblingUrl` to the other game's HTTPS URL. These are public routing/identity values, not credentials. Do not put treasury overrides, private keys, PATs, JWTs, session tokens or Privy secrets here. The player sees payment terms from the authoritative Studio quote.
+`display` defaults to `embed`; `popup` is an explicit configuration option. The player flow provides one Play button, local unrecorded Practice, a wallet/purchase recovery menu, and separate official versus practice results. Pack price and currency are never set in this public game config; the player reviews the current server quote. Keep the second game on the same `groupId` but its own `appId` and `appOrigin`. Never place treasury overrides, private keys, PATs, JWTs, session tokens or Privy secrets here.
 
 ```sh
 pnpm build -- --config ./target-rush.config.json --output ./dist/target-rush.zip
@@ -395,13 +447,13 @@ Successful responses contain `{ "version": "1", "eventId": "..." }`. HTTP 404 ca
 
 ## 7. Player flow: four separate approvals and authoritative results
 
-The deployed game owns visible UI and recovery records, not the credit ledger. Never replace these steps with an arbitrary USDC transfer or a browser-submitted score.
+The deployed game owns visible UI and recovery records, not the credit ledger. Never replace these steps with a client-selected ETH/USDC transfer or a browser-submitted score.
 
-1. **Sign in explicitly.** Connect's popup handles identity/wallet interaction. The app exchanges the Connect credential for a short-lived `GameAuthorization` bound to wallet, group, app and exact origin. Login/connection must not buy, reserve or start a play. Reuse valid sessions, and discard cached authorizations when the account changes.
-2. **Choose a purchase explicitly.** Show the current offer and balances. Create an account-bound quote *before* transferring. Persist the quote, wallet/scope, snapshotted terms and expiry. Confirm chain `1`, canonical USDC, quoted treasury and atomic amount. The player reviews the **10 credits / 0.01 USDC plus gas** choice in the hosted flow; they separately approve any real wallet action. The quote's wallet must be the payer.
-3. **Claim the payment.** Preserve the hosted transfer intent ID before opening checkout, then the returned transaction hash. The published transfer API uses `currency: "USDC"` and an atomic-unit amount string. Only Studio's successful claim of that exact quote/hash and authoritative balance establish that credits exist; wallet success UI alone does not. A qualifying payment normally must be mined within the quote's 30-minute window and above its snapshotted lower block bound. Earlier qualifying payments can be claimed after expiry/purchase pause. Canonical inclusion is checked at the current head, not finalized settlement; later reorgs are not automatically reversed.
-4. **Confirm each credit spend explicitly.** Fetch current terms, show **Play — spend 1 credit** (or the returned actual cost), and request one-use consent only after that choice. Persist the attempt key, fingerprint, expected cost, original start fields and consent before paid start. Studio reserves the cost and captures the debit once initialization succeeds. A valid paid `PlaySession` admits one server-managed round, not a free-session fallback or multiple adapters.
-5. **Run and finish on the server.** Resolve the event on the game's own origin, save a separate server-run key, and start with the paid PlaySession. The response provides a same-origin WebSocket URL with a one-time ticket. The browser sends ordered player inputs, not score/state/time. Target Rush uses server-issued targets; Color Match uses server-issued desired colors and wrong choices must not score. Only the server's terminal result is official. Complete the paid PlaySession after terminal confirmation and recover completion for that same session if necessary.
+1. **Sign in explicitly.** Connect opens in the page by default; a creator may configure popup mode, and unsupported embeds require an explicit popup retry. The app exchanges the Connect credential for a short-lived `GameAuthorization` bound to wallet, group, app and exact origin. Login/connection must not buy, reserve or start a play.
+2. **Choose a purchase explicitly.** Show the authoritative quote's currency, token (if any), atomic amount, pack credits, chain, recipient and expiry before transfer. ETH amounts are wei; USDC amounts use that token's atomic units. Persist the quote, wallet/scope and snapshotted terms. The wallet must match the quote payer.
+3. **Claim the payment.** Preserve the hosted transfer intent ID before opening checkout, then the returned transaction hash. Connect transfers native ETH or supported USDC; no arbitrary ERC-20 path is offered. Studio checks the exact quote's currency/asset, payer, recipient, amount, chain, successful canonical receipt and payment time. Smart-account ETH transfers require matching non-reverted `CALL` trace evidence; missing trace/RPC evidence fails closed. The server uses `ALCHEMY_API_KEY` to derive the chain-specific RPC; there is no global node URL override or public-node fallback. Only claim success and the authoritative balance establish credits.
+4. **Confirm each credit spend explicitly.** The one Play button signs in and authorizes the game as needed, guides the player to buy a pack if their balance is insufficient, then requests fresh one-use consent before a paid start. Persist the attempt key, fingerprint, expected cost, original start fields and consent before paid start. Studio reserves the cost and captures the debit once initialization succeeds.
+5. **Run and finish on the server.** Resolve the event on the game's own origin, save a separate server-run key, and start with the paid PlaySession. The browser sends ordered player inputs, not score/state/time. Target Rush uses server-issued targets; Color Match uses server-issued desired colors and wrong choices must not score. Only the server's terminal result is official. Local Practice makes no paid-start or official-score calls and is clearly unrecorded. Complete the paid PlaySession after terminal confirmation and recover completion for that same session if necessary.
 
 Available, total purchased and reserved balances are distinct. New wallets have **zero** purchased credits: there is no seeded pack, weekly reset, faucet or automatic allowance. Insufficient funds should offer an explicit purchase, never initiate one. Registered apps' ordinary `/games/:appId/sessions` path is gated with HTTP 402; it is not a paid-start bypass.
 
@@ -424,30 +476,32 @@ Do not clear browser storage while recovering a payment/start. A different app o
 
 ### Safe unpaid smoke
 
-- [ ] Clone and install using only the published browser dependency; build each game with its own config and no SDK checkout.
-- [ ] Confirm both ZIPs have the required root client/config/verifier/scoring artifacts and different game variants.
-- [ ] Check app IDs/origins against CLI deployment responses; check both approved registrations cost `1` in the same group.
-- [ ] Inspect chain, USDC, controlled treasury, `10000`/`10`, purchase pause and new-use pause states before showing a purchase button.
+- [ ] Clone and install from the supplied Connect/CLI archives; do not rely on an unpublished npm release or SDK checkout.
+- [ ] Confirm both ZIPs contain root client/config/verifier/scoring artifacts and different game variants.
+- [ ] Check app IDs/origins against CLI deployment responses; confirm both approved registrations cost `1` credit in the same group.
+- [ ] Inspect the group's immutable chain, currency/token, treasury, pack terms, purchase pause and new-use pause before enabling the purchase UI.
 - [ ] Update both original app IDs; publish each current deployment's matching verifier/event and verify its active-event endpoint.
-- [ ] Open each deployed HTTPS page. Check controls, game variant and errors. No transfer, claim, consent, reservation or run should begin on page load/reload.
-- [ ] Click Connect and verify popup sign-in works on the registered origin. Connecting alone changes neither balance nor transaction history. A fresh wallet reads zero; do not grant test credits to manufacture success.
-- [ ] Open/cancel a purchase UI before wallet approval if testing cancellation; opening or quoting is not a successful purchase. Preserve any pending quote/intent information.
-- [ ] Confirm disabled play/no active-event/insufficient-credit cases explain the issue instead of using an unpaid fallback or local official score.
+- [ ] Open each deployed HTTPS page. Check both game variants and errors. No transfer, claim, consent, reservation or run should begin on load/reload.
+- [ ] Exercise the single Play entry: embed or configured popup sign-in, game authorization, insufficient-balance handoff to the wallet menu, purchase recovery visibility, and explicit one-credit consent. No real transfer is needed for this check.
+- [ ] Run both local Practice modes. Confirm controls work and each result is labeled local/unrecorded; no paid start or official score is sent.
+- [ ] Confirm wallet menu exposes current account, balance, sign-out/switch and saved purchase recovery without starting a transaction when merely opened.
+- [ ] Open/cancel a purchase quote before wallet approval if testing cancellation; quoting alone is not a transfer. Preserve any pending quote/intent information.
+- [ ] Ensure missing authorization, active event or credits produce actionable errors, never unpaid official scoring.
 
 These checks can establish deployment/auth/configuration, **not** successful paid acceptance. Do not say that a built ZIP or a successful creator API request proves payment or gameplay.
 
 ### Explicit real-mainnet wallet step
 
-This is optional until the payer explicitly approves it. Agree on **one 0.01-USDC pack on Ethereum plus gas**, the exact controlled recipient, and **one credit per explicitly confirmed play**. Creator CLI access is not this approval. Never automate a transfer or credit grant as part of deployment.
+This is optional and requires the payer's explicit approval. Agree on the exact configured currency, pack credits/amount, chain, recipient and **one credit per explicitly confirmed play**. For a test of the new native path, use a group configured for ETH; USDC tests only the existing token path. Creator CLI access is not payer approval. Never automate a transfer or credit grant as part of deployment.
 
-- [ ] The payer clicks Buy in Target Rush, reviews the current quote/recipient/chain and explicitly approves the hosted wallet action. Record purchase ID and transaction hash without logging secrets.
-- [ ] Claim that quote and confirm the authoritative available balance increases by **10**, exactly once. Repeating the same successful claim must not grant a second pack. Do not submit a second transfer to test idempotency.
-- [ ] Confirm **Play — spend 1 credit** once in Target Rush. Finish a real server-scored round; balance should fall by **1**, not by repeated clicks or response retries. Confirm a server result and completion.
-- [ ] Open Color Match on its different origin and connect the **same wallet**. It should read the same group's remaining balance without another purchase.
-- [ ] Explicitly confirm one Color Match play. Try a wrong color and verify no point is earned, then a correct server-requested color. Finish with a server result. Both games should now report the same balance, normally **8 available** from a fresh 10-credit pack with no other operations/reservations.
-- [ ] Exercise saved quote/claim and paid-start/server-run recovery without generating a fresh payment or idempotency key. Confirm the original operation, not an extra charge/run, is recovered.
-- [ ] Switch wallets and back. Verify the second wallet does not inherit the first wallet's balance/recovery record and that reload/login never auto-spends.
-- [ ] Record exercised evidence separately from unexercised cases, including any retained reservation or unsupported browser-storage behavior.
+- [ ] The payer selects Buy in Target Rush, reviews the quote (asset, atomic amount, credits, recipient, chain, expiry) and explicitly approves the Connect wallet action. Record purchase ID and transaction hash without logging secrets.
+- [ ] Claim that quote and confirm available balance increases by the quoted `packCredits`, exactly once. Repeating the same successful claim must not grant a second pack. Never submit a duplicate transfer to test idempotency.
+- [ ] Confirm Play's one-credit spend once in Target Rush. Finish a server-scored round; the balance falls by one, and the end screen labels the server score as recorded.
+- [ ] Open Color Match on its different origin and connect the same wallet. It reads the same group's remaining balance without another purchase.
+- [ ] Confirm one Color Match play; verify the wrong color earns no point, then finish the server-scored round. Balance reflects the two one-credit spends and any other operations.
+- [ ] Exercise saved quote/claim and paid-start/server-run recovery without generating a fresh payment or idempotency key.
+- [ ] Switch wallets and back. The second wallet must not inherit the first wallet's balance/recovery record; reload/login never auto-spends.
+- [ ] Record exercised evidence separately from unexercised cases, including retained reservations or unsupported storage behavior.
 
 Do not falsify an end-to-end result if no real payer approved a transfer. Report **unpaid smoke passed; paid mainnet step not exercised** where appropriate.
 
